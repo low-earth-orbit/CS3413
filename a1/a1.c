@@ -174,9 +174,9 @@ void printList(Node *head)
 }
 
 /*
- * prints node to the console
+ * prints single node to the console
  */
-void printNode(Node *node)
+void printSingleNode(Node *node)
 {
     // if node is empty
     if (node == NULL)
@@ -201,7 +201,7 @@ void printFullList(Node *head)
     }
 
     printf("Value of head node: ");
-    printNode(head);
+    printSingleNode(head);
 
     // traverse list
     while (head != NULL)
@@ -235,6 +235,12 @@ void printFullList(Node *head)
  */
 int stop(Node **head)
 {
+    // if list is empty
+    if (*head == NULL)
+    {
+        return 0;
+    }
+
     while (*head != NULL)
     {
         Node *temp = *head;
@@ -242,7 +248,7 @@ int stop(Node **head)
         free(temp->data);
         free(temp);
     }
-    *head = NULL; // reset head
+    *head = NULL; // reset head after free memory
 
     return 0;
 }
