@@ -242,6 +242,7 @@ int stop(Node **head)
         free(temp->data);
         free(temp);
     }
+    *head = NULL; // reset head
 
     return 0;
 }
@@ -249,27 +250,44 @@ int stop(Node **head)
 int main()
 {
     Node *head = NULL;
-    add(&head, "first");
-    add(&head, "second");
-    add(&head, "third");
-    add(&head, "fourth");
 
-    printFullList(head);
+    char line[206];
+    char operation;
+    char data[101];    // assuming a maximum length of 100
+    char newData[101]; // assuming a maximum length of 100
+    while ((fgets(line, sizeof(line), stdin) != NULL))
+    {
+        sscanf(line, " %c %s %s", &operation, data, newData); // sscanf to parse the line
+        switch (operation)
+        {
+        case 'a':
+            add(&head, data);
+            break;
+        case 'd':
+            delete (&head, data);
+            break;
+        case 'c':
+            contains(head, data);
+            break;
+        case 'f':
+            findAndReplace(head, data, newData);
+            break;
+        case 'p':
+            printList(head);
+            break;
+        case 's':
+            stop(&head);
+            break;
+        default:
+            break;
+        }
+        // debug
+        // printf("Operation: %c\n", operation);
+        // printf("List is now:\n");
+        // printFullList(head);
+    }
 
-    printf("Before delete contains second? %i\n", contains(head, "second"));
-    delete (&head, "second");
-    printf("After delete contains second? %i\n", contains(head, "second"));
-    printFullList(head);
-
-    delete (&head, "first");
-    printFullList(head);
-
-    delete (&head, "third");
-    printFullList(head);
-
-    findAndReplace(head, "fourth", "newData");
-    printFullList(head);
-
+    // lastly, free memory
     stop(&head);
     return 0;
 }
