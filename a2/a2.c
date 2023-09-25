@@ -41,7 +41,7 @@ int main()
                 printf("(%d)Hello, I am a child process\n", getpid());
 
                 // child process logic
-                
+
                 exit(0); // kill the child process
             }
             else
@@ -51,6 +51,103 @@ int main()
 
                 // wait for the child process to finish
                 waitpid(child_pid, NULL, 0);
+            }
+        }
+        else if (strcmp(input, "addnumbers") == 0)
+        {
+            // setup two pipes
+            int parentToChildPipe[2];
+            int childToParentPipe[2];
+
+            if (pipe(parentToChildPipe) == -1 || pipe(childToParentPipe) == -1)
+            {
+                perror("Pipe creation failed");
+                return 1;
+            }
+
+            // fork a child process
+            pid_t child_pid = fork();
+
+            if (child_pid == -1)
+            {
+                perror("Fork failed");
+                return 1;
+            }
+
+            if (child_pid == 0)
+            {
+                // This is the child process
+                close(parentToChildPipe[1]); // Close the write end of the parentToChildPipe
+                close(childToParentPipe[0]); // Close the read end of the childToParentPipe
+
+                int sum = 0;
+                int num;
+
+                while (1)
+                {
+                    if (read(parentToChildPipe[0], &num, sizeof(int)) <= 0)
+                    {
+                        perror("Read failed");
+                        close(parentToChildPipe[0]);
+                        close(childToParentPipe[1]);
+                        return 1;
+                    }
+
+                    sum += num;
+                    printf("(%d)The subtotal is: %d\n", getpid(), sum);
+
+                    if (num == 0)
+                    {
+                        // Send the sum to the parent process
+                        write(childToParentPipe[1], &sum, sizeof(int));
+
+                        // Close the pipes
+                        close(parentToChildPipe[0]);
+                        close(childToParentPipe[1]);
+
+                        exit(0); // Terminate the child process
+                    }
+                }
+            }
+            else
+            {
+                // This is the parent process
+                close(parentToChildPipe[0]); // Close the read end of the parentToChildPipe
+                close(childToParentPipe[1]); // Close the write end of the childToParentPipe
+
+                int num;
+
+                while (1)
+                {
+                    printf("(%d)Please input number, (0) to terminate\n", getpid());
+                    fgets(input, sizeof(input), stdin);
+                    sscanf(input, "%d", &num);
+
+                    // print number read
+                    printf("(%d)Read  %d\n", getpid(), num);
+
+                    // Send numbers to the child process
+                    write(parentToChildPipe[1], &num, sizeof(int));
+
+                    if (num == 0)
+                    {
+                        // Close the write end of the pipe
+                        close(parentToChildPipe[1]);
+
+                        // Wait for the child process to finish
+                        waitpid(child_pid, NULL, 0);
+
+                        // Receive the sum from the child process
+                        int sum;
+                        read(childToParentPipe[0], &sum, sizeof(int));
+                        printf("(%d)The sum is %d\n", getpid(), sum);
+
+                        // Close the read end of the childToParentPipe
+                        close(childToParentPipe[0]);
+
+                        break; // Exit the loop if zero is encountered
+                    }
+                }
             }
         }
         else
