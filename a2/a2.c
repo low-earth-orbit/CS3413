@@ -40,9 +40,8 @@ int main()
                 // This is the child process
                 printf("(%d)Hello, I am a child process\n", getpid());
 
-                // child process logic
-
-                exit(0); // kill the child process
+                // exit the child process with status 0
+                exit(0);
             }
             else
             {
@@ -50,12 +49,13 @@ int main()
                 printf("(%d)Hello, I am a parent process\n", getpid());
 
                 // wait for the child process to finish
-                waitpid(child_pid, NULL, 0);
+                // to be more specific, I can use: waitpid(child_pid, NULL, 0);
+                wait(NULL);
             }
         }
         else if (strcmp(input, "addnumbers") == 0)
         {
-            // setup two pipes
+            // create two pipes
             int parentToChildPipe[2];
             int childToParentPipe[2];
 
@@ -96,16 +96,20 @@ int main()
                     sum += num;
                     printf("(%d)The subtotal is: %d\n", getpid(), sum);
 
+                    // if user entered 0, end the read process
                     if (num == 0)
                     {
+                        // Close the read end of the parent to child pipe
+                        close(parentToChildPipe[0]);
+
                         // Send the sum to the parent process
                         write(childToParentPipe[1], &sum, sizeof(int));
 
-                        // Close the pipes
-                        close(parentToChildPipe[0]);
+                        // Close the write end of the child to parent pipe
                         close(childToParentPipe[1]);
 
-                        exit(0); // Terminate the child process
+                        // Terminate the child process
+                        exit(0);
                     }
                 }
             }
@@ -135,7 +139,7 @@ int main()
                         close(parentToChildPipe[1]);
 
                         // Wait for the child process to finish
-                        waitpid(child_pid, NULL, 0);
+                        wait(NULL);
 
                         // Receive the sum from the child process
                         int sum;
