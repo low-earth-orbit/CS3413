@@ -154,6 +154,104 @@ int main()
                 }
             }
         }
+        else if (strcmp(input, "exec") == 0)
+        {
+            char **args = NULL; // initialize a dynamic array to hold the args of the subcommand
+            int count = 0;      // count of args in the array
+
+            // prompt the user to input subcommand and arguments
+            printf("(%d) Please input exec subcommand\n", getpid());
+
+            while (1)
+            {
+                // read the input of each line
+                if (fgets(input, sizeof(input), stdin) == NULL)
+                {
+                    perror("Read failed");
+                    for (int i = 0; i < count; i++)
+                        free(args[i]);
+                    free(args);
+                    return 1;
+                };
+
+                // Remove newline character if present
+                size_t len = strlen(input);
+                if (len > 0 && input[len - 1] == '\n')
+                {
+                    input[len - 1] = '\0';
+                }
+
+                // break the loop when ; is detected
+                if (strcmp(input, ";") == 0)
+                    break;
+
+                // reallocate memory for new command
+                args = realloc(args, (count + 1) * sizeof(char *));
+                if (args == NULL)
+                {
+                    perror("Memory allocation failed");
+                    return 1;
+                }
+
+                // store new command to array
+                args[count] = strdup(input);
+                if (args[count] == NULL)
+                {
+                    perror("Memory allocation failed");
+                    for (int i = 0; i < count; i++)
+                        free(args[i]);
+                    free(args);
+                    return 1;
+                }
+
+                count++;
+            }
+
+            // add NULL to the end of arguments array
+            // this is required by execvp()
+            args = realloc(args, (count + 1) * sizeof(char *));
+            if (args == NULL)
+            {
+                perror("Memory allocation failed");
+                return 1;
+            }
+            args[count] = NULL;
+
+            // create child process
+            pid_t child_pid = fork();
+
+            if (child_pid == -1)
+            {
+                perror("Fork failed");
+                return 1;
+            }
+
+            if (child_pid == 0)
+            {
+                // This is the child process
+                // execute the command
+                execvp(args[0], args);
+
+                // if execvp() is successful, none of the code below will run
+                // execvp() will only return if there is an error
+                perror("Execution failed");
+                for (int i = 0; i < count; i++)
+                    free(args[i]);
+                free(args); // free dynamically allocated memory
+                return 1;
+            }
+            else
+            {
+                // This is the parent process
+                // wait for the child process to finish
+                wait(NULL);
+            }
+
+            // free memory allocated for args
+            for (int i = 0; i < count; i++)
+                free(args[i]);
+            free(args);
+        }
         else
         {
             printf("(%d) You entered: %s\n", getpid(), input);
