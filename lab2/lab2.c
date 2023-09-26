@@ -72,7 +72,7 @@ int main()
             }
 
             // print the word
-            printf("Output: %s\n", word);
+            printf("%s\n", word);
 
             // exit the grandchild process with status 0
             printf("(%d)Terminating the grandchild process\n", getpid());
@@ -81,16 +81,14 @@ int main()
         else
         {
             // This is the child process
+            printf("(%d)Hello, I am the child process\n", getpid());
+
             // in child process, close the read end of childToGrandchild pipe
             close(childToGrandchildPipe[0]);
 
             // scan one word input from user
             char word[100];
-            printf("Enter a word: ");
             scanf("%s", word);
-
-            // Output the number the user typed
-            printf("Read: %s\n", word);
 
             // Send word to the grandchild process
             write(childToGrandchildPipe[1], word, 100 * sizeof(char));
@@ -98,8 +96,6 @@ int main()
 
             // wait for the child process to finish
             wait(NULL);
-
-            printf("(%d)Hello, I am the child process\n", getpid());
         }
 
         // exit the child process with status 0
@@ -108,11 +104,10 @@ int main()
     }
     else
     {
-        // wait for the child process to finish
-        wait(NULL);
-
         // This is the parent process
         printf("(%d)Hello, I am the parent process\n", getpid());
+        // wait for the child process to finish
+        wait(NULL);
     }
 
     printf("(%d)Ending the program / terminating the parent process\n", getpid());
