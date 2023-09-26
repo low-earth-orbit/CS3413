@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <math.h>
 
 int main()
 {
@@ -252,9 +253,44 @@ int main()
                 free(args[i]);
             free(args);
         }
-        else
+        else if (strcmp(input, "processtree") == 0)
         {
-            printf("(%d) You entered: %s\n", getpid(), input);
+            int num;
+            // prompt the user to enter an integer
+            printf("Please input the integer\n");
+            fgets(input, sizeof(input), stdin);
+            sscanf(input, "%d", &num);
+
+            printf("You entered: %d\n", num);
+
+            int max = (int)pow((double)2, (double)num) - 1;
+
+            // iterate through 0 to max
+            for (int i = 0; i <= max; i++)
+            {
+                pid_t child_pid = fork();
+
+                if (child_pid == -1)
+                {
+                    perror("Fork failed");
+                    return 1;
+                }
+
+                if (child_pid == 0)
+                {
+                    // This is the child process
+                    printf("(%d)The value is %d\n", getpid(), i);
+
+                    // exit the child process with status 0
+                    exit(0);
+                }
+                else
+                {
+                    // This is the parent process
+                    // Do not wait for the child process to finish
+                    // To allow parallel execution
+                }
+            }
         }
     }
 
