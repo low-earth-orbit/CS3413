@@ -265,8 +265,13 @@ int main()
 
             int max = (int)pow((double)2, (double)num) - 1;
 
-            // iterate through 0 to max
-            for (int i = 0; i <= max; i++)
+            // print 0, which is singled out in the parent process
+            printf("(%d)The value is 0\n", getpid());
+
+            // iterate through 1 to max
+            // this will guarantee (2^num - 1) child processes created
+            // for num = 5, that is (32 - 1) = 31 child processes
+            for (int i = 1; i <= max; i++)
             {
                 pid_t child_pid = fork();
 
