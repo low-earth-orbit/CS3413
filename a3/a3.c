@@ -25,10 +25,42 @@ int houseFloor[2];
 // Pipe between movers and truckers
 int nextToTrucks[2];
 
-// some function definitions follow
-void *run(void *param)
+// thread parameter
+typedef struct
 {
-    printf("Hello from run\n");
+    int id;
+    unsigned int seed;
+} DwellerParam;
+
+// some function definitions follow
+void *dweller_run(void *param)
+{
+    DwellerParam *p = (DwellerParam *)param;
+    printf("Hello from house dweller %d\n", p->id);
+
+    for (int i = 0; i < NUMBER_OF_BOXES_PER_DWELLER; i++)
+    {
+        int interval = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_HOUSE_DWELLER, MAX_TIME_FOR_HOUSE_DWELLER, (p->seed));
+        int weight = RANDOM_WITHIN_RANGE(MIN_BOX_WEIGHT, MAX_BOX_WEIGHT, (p->seed));
+        sleep(interval);
+
+        printf("House dweller %d created a box that weights %d in %d units of time\n", p->id, weight, interval);
+    }
+    printf("House dweller %d is done packing\n", p->id);
+    pthread_exit(0);
+}
+
+void *mover_run(void *param)
+{
+    int i = *((int *)param);
+    printf("Hello from mover %d\n", i);
+    pthread_exit(0);
+}
+
+void *driver_run(void *param)
+{
+    int i = *((int *)param);
+    printf("Hello from truck driver %d\n", i);
     pthread_exit(0);
 }
 
@@ -37,34 +69,67 @@ int main(int argc, char **argv)
     srand(time(NULL));
 
     // rest of the program follows
-    printf("In main (1)\n");
-
     // Prompt user for input
-    int num_people, num_movers, num_drivers;
+    int num_dwellers, num_movers, num_drivers;
     printf("Please input number of people living in the house, number of movers and number of truck drivers\n");
-    scanf("%d %d %d", &num_people, &num_movers, &num_drivers);
-    if (num_people < 0 || num_movers < 0 || num_drivers < 0)
+    scanf("%d %d %d", &num_dwellers, &num_movers, &num_drivers);
+    if (num_dwellers < 0 || num_movers < 0 || num_drivers < 0)
     {
-        printf("Invalid input! All numbers must be non-negative.\n");
+        printf("Invalid input\n");
         return 1;
     }
 
-    printf("Number of people living in the house: %d\n", num_people);
-    printf("Number of movers: %d\n", num_movers);
-    printf("Number of truck drivers: %d\n", num_drivers);
+    // 3 types of threads: dweller, mover, driver
+    pthread_t dweller_threads[num_dwellers];
+    pthread_t mover_threads[num_movers];
+    pthread_t driver_threads[num_drivers];
 
-    // create 3 threads
-    pthread_t threads[3];
-    for (int i = 0; i < 3; i++)
+    // IDs
+    int dweller_ids[num_dwellers];
+    int mover_ids[num_movers];
+    int driver_ids[num_drivers];
+
+    // thread parameters
+    DwellerParam dweller_params[num_dwellers];
+
+    // create dweller threads
+    for (int i = 0; i < num_dwellers; i++)
     {
-        pthread_create(&threads[i], NULL, &run, NULL);
+        dweller_params[i].id = i;
+        dweller_params[i].seed = rand();
+        pthread_create(&dweller_threads[i], NULL, dweller_run, &dweller_params[i]);
+    }
+
+    // do the same for mover
+    for (int i = 0; i < num_movers; i++)
+    {
+        mover_ids[i] = i;
+        pthread_create(&mover_threads[i], NULL, mover_run, &mover_ids[i]);
+    }
+
+    // do the same for driver
+    for (int i = 0; i < num_drivers; i++)
+    {
+        driver_ids[i] = i;
+        pthread_create(&driver_threads[i], NULL, driver_run, &driver_ids[i]);
     }
 
     // join all threads
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < num_dwellers; i++)
     {
-        pthread_join(threads[i], NULL);
+        pthread_join(dweller_threads[i], NULL);
     }
+
+    for (int i = 0; i < num_movers; i++)
+    {
+        pthread_join(mover_threads[i], NULL);
+    }
+
+    for (int i = 0; i < num_drivers; i++)
+    {
+        pthread_join(driver_threads[i], NULL);
+    }
+
     printf("In main (2)\n");
     return 0;
 }
