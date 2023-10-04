@@ -90,6 +90,7 @@ void *dweller_run(void *param)
     if (active_dwellers == 0)
     {
         close(houseFloor[WRITE_END]); // close write end of houseFloor pipe after all dwellers are about to done
+        pthread_cond_signal(&box_available_for_mover);
     }
     pthread_mutex_unlock(&mutex);
 
@@ -110,7 +111,7 @@ void *mover_run(void *param)
     int interval;
     int status;
 
-    while (1)
+    while (box_to_drive != 0 || active_movers != 0) // tripping
     {
         pthread_mutex_lock(&mutex);
 
@@ -146,7 +147,6 @@ void *mover_run(void *param)
 
         interval = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_MOVER, MAX_TIME_FOR_MOVER, (p->seed));
 
-        // DEBUG:
         sleep(interval);
 
         printf("Mover %d brought down a box that weights %d in %d units of time\n", p->id, weight, interval);
@@ -175,8 +175,9 @@ void *mover_run(void *param)
 
     if (active_movers == 0)
     {
-        close(houseFloor[READ_END]);    // close read end of the pipe when the last active thread is about to terminate
-        close(nextToTrucks[WRITE_END]); // close write end of nextToTrucks
+        close(houseFloor[READ_END]);
+        close(nextToTrucks[WRITE_END]);
+        pthread_cond_signal(&box_available_for_driver);
     }
     pthread_mutex_unlock(&mutex);
 
@@ -195,22 +196,26 @@ void *driver_run(void *param)
     int room;
     int sum_weight;
 
-    while (box_to_drive > 0 || active_movers > 0) // tripping
+    while (1) // tripping
     {
         room = ROOM_IN_TRUCK;
         sum_weight = 0;
-        while (room > 0 && (box_to_drive > 0 || (active_movers > 0 && box_to_drive == 0))) // loading
+
+        while (room > 0) // loading
         {
             pthread_mutex_lock(&mutex);
 
-            while (box_to_drive == 0)
+            while (box_to_drive == 0 && active_movers > 0)
             {
-                if (active_movers == 0)
-                {
-                    pthread_mutex_unlock(&mutex);
-                    break;
-                }
+                printf("Driver %d waiting for a box. Boxes to drive: %d Active movers: %d\n", p->id, box_to_drive, active_movers);
                 pthread_cond_wait(&box_available_for_driver, &mutex);
+            }
+
+            if (box_to_drive == 0 && active_movers == 0)
+            {
+                printf("Driver %d sees no boxes left and no active movers. Exiting inner loop.\n", p->id);
+                pthread_mutex_unlock(&mutex);
+                break;
             }
 
             status = read(nextToTrucks[READ_END], &weight, sizeof(weight));
@@ -224,16 +229,16 @@ void *driver_run(void *param)
                 break;
             }
 
-            if (status == 0) // EOF
-            {
-                break;
-            }
+            // if (status == 0) // EOF
+            // {
+            //     break;
+            // }
 
             load_time = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_TRUCKER, MAX_TIME_FOR_TRUCKER, (p->seed));
 
-            // DEBUG:
             sleep(load_time);
             room--;
+
             sum_weight += weight;
 
             printf("Trucker %d  loaded up a box that weights %d to the truck, took %d units of time, room left:%d\n", (p->id), weight, load_time, room);
@@ -248,6 +253,14 @@ void *driver_run(void *param)
                trip_time);
 
         sleep(trip_time);
+
+        pthread_mutex_lock(&mutex);
+        if (box_to_drive == 0 && active_movers == 0)
+        {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
+        pthread_mutex_unlock(&mutex);
     }
 
     pthread_mutex_lock(&mutex);
