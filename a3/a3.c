@@ -64,7 +64,6 @@ void *dweller_run(void *param)
         interval = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_HOUSE_DWELLER, MAX_TIME_FOR_HOUSE_DWELLER, (p->seed));
         weight = RANDOM_WITHIN_RANGE(MIN_BOX_WEIGHT, MAX_BOX_WEIGHT, (p->seed));
 
-        // TODO:
         sleep(interval);
 
         printf("House dweller %d created a box that weights %d in %d units of time\n", p->id, weight, interval);
@@ -80,7 +79,7 @@ void *dweller_run(void *param)
         }
 
         box_to_move++;
-        pthread_cond_signal(&box_available_for_mover); // signal to mover that box is available
+        pthread_cond_broadcast(&box_available_for_mover); // signal to mover that box is available
         pthread_mutex_unlock(&mutex);
     }
 
@@ -90,7 +89,7 @@ void *dweller_run(void *param)
     if (active_dwellers == 0)
     {
         close(houseFloor[WRITE_END]); // close write end of houseFloor pipe after all dwellers are about to done
-        pthread_cond_signal(&box_available_for_mover);
+        pthread_cond_broadcast(&box_available_for_mover);
     }
     pthread_mutex_unlock(&mutex);
 
@@ -111,7 +110,7 @@ void *mover_run(void *param)
     int interval;
     int status;
 
-    while (box_to_drive != 0 || active_movers != 0) // tripping
+    while (box_to_drive > 0 || active_movers > 0)
     {
         pthread_mutex_lock(&mutex);
 
@@ -162,7 +161,7 @@ void *mover_run(void *param)
         }
 
         box_to_drive++;
-        pthread_cond_signal(&box_available_for_driver); // signal to driver that box is available
+        pthread_cond_broadcast(&box_available_for_driver); // signal to driver that box is available
 
         pthread_mutex_unlock(&mutex);
     }
@@ -177,7 +176,7 @@ void *mover_run(void *param)
     {
         close(houseFloor[READ_END]);
         close(nextToTrucks[WRITE_END]);
-        pthread_cond_signal(&box_available_for_driver);
+        pthread_cond_broadcast(&box_available_for_driver); // Bug fixed: Use broadcast instead of signal to wake up all awaiting truck drivers
     }
     pthread_mutex_unlock(&mutex);
 
@@ -207,13 +206,11 @@ void *driver_run(void *param)
 
             while (box_to_drive == 0 && active_movers > 0)
             {
-                printf("Driver %d waiting for a box. Boxes to drive: %d Active movers: %d\n", p->id, box_to_drive, active_movers);
                 pthread_cond_wait(&box_available_for_driver, &mutex);
             }
 
             if (box_to_drive == 0 && active_movers == 0)
             {
-                printf("Driver %d sees no boxes left and no active movers. Exiting inner loop.\n", p->id);
                 pthread_mutex_unlock(&mutex);
                 break;
             }
@@ -229,10 +226,10 @@ void *driver_run(void *param)
                 break;
             }
 
-            // if (status == 0) // EOF
-            // {
-            //     break;
-            // }
+            if (status == 0) // EOF
+            {
+                break;
+            }
 
             load_time = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_TRUCKER, MAX_TIME_FOR_TRUCKER, (p->seed));
 
