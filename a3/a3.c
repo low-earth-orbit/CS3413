@@ -13,7 +13,7 @@
 #define MAX_TIME_FOR_MOVER 3
 #define MIN_TIME_FOR_MOVER 1
 #define MIN_TIME_FOR_TRUCKER 1
-#define MAX_TIME_FOR_TRUCKER 3f
+#define MAX_TIME_FOR_TRUCKER 3
 #define MIN_TRIP_TIME 5
 #define MAX_TRIP_TIME 10
 #define RANDOM_WITHIN_RANGE(a, b, seed) (a + rand_r(&seed) % (b - a))
@@ -34,8 +34,11 @@ typedef struct
 } RunnerParam;
 
 // mutex
-pthread_cond_t box_available = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+// condition
+pthread_cond_t box_available_for_mover = PTHREAD_COND_INITIALIZER;
+pthread_cond_t box_available_for_driver = PTHREAD_COND_INITIALIZER;
 
 // active thread counter
 int active_dwellers;
@@ -77,7 +80,7 @@ void *dweller_run(void *param)
         }
 
         box_to_move++;
-        pthread_cond_signal(&box_available); // signal to mover that box is available
+        pthread_cond_signal(&box_available_for_mover); // signal to mover that box is available
         pthread_mutex_unlock(&mutex);
     }
 
@@ -114,7 +117,7 @@ void *mover_run(void *param)
         // Dweller is still working, though no available box yet
         while (box_to_move == 0 && active_dwellers > 0)
         {
-            pthread_cond_wait(&box_available, &mutex);
+            pthread_cond_wait(&box_available_for_mover, &mutex);
         }
 
         // Finished moving
@@ -148,30 +151,118 @@ void *mover_run(void *param)
 
         printf("Mover %d brought down a box that weights %d in %d units of time\n", p->id, weight, interval);
 
+        // lock mutex before writing
         pthread_mutex_lock(&mutex);
+
+        // write to nextToTrucks pipe
+        status = write(nextToTrucks[WRITE_END], &weight, sizeof(weight));
+        if (status == -1)
+        {
+            printf("Write to nextToTrucks pipe failed\n");
+        }
+
         box_to_drive++;
+        pthread_cond_signal(&box_available_for_driver); // signal to driver that box is available
+
         pthread_mutex_unlock(&mutex);
     }
 
     pthread_mutex_lock(&mutex);
     active_movers--; // decrement active thread counter
-    pthread_mutex_unlock(&mutex);
 
     // DEBUG:
     // printf("active_movers = %d\n", active_movers);
 
     if (active_movers == 0)
     {
-        close(houseFloor[READ_END]); // close read end of the pipe when the last active thread is about to terminate
+        close(houseFloor[READ_END]);    // close read end of the pipe when the last active thread is about to terminate
+        close(nextToTrucks[WRITE_END]); // close write end of nextToTrucks
     }
+    pthread_mutex_unlock(&mutex);
 
     pthread_exit(0);
 }
 
 void *driver_run(void *param)
 {
-    int i = *((int *)param);
-    printf("Hello from truck driver %d\n", i);
+    RunnerParam *p = (RunnerParam *)param;
+    printf("Hello from truck driver %d\n", p->id);
+
+    int weight;
+    int load_time;
+    int trip_time;
+    int status;
+    int room;
+    int sum_weight;
+
+    while (box_to_drive > 0 || active_movers > 0) // tripping
+    {
+        room = ROOM_IN_TRUCK;
+        sum_weight = 0;
+        while (room > 0 && (box_to_drive > 0 || (active_movers > 0 && box_to_drive == 0))) // loading
+        {
+            pthread_mutex_lock(&mutex);
+
+            while (box_to_drive == 0)
+            {
+                if (active_movers == 0)
+                {
+                    pthread_mutex_unlock(&mutex);
+                    break;
+                }
+                pthread_cond_wait(&box_available_for_driver, &mutex);
+            }
+
+            status = read(nextToTrucks[READ_END], &weight, sizeof(weight));
+            box_to_drive--;
+
+            pthread_mutex_unlock(&mutex);
+
+            if (status == -1)
+            {
+                printf("Read from nextToTrucks pipe failed\n");
+                break;
+            }
+
+            if (status == 0) // EOF
+            {
+                break;
+            }
+
+            load_time = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_TRUCKER, MAX_TIME_FOR_TRUCKER, (p->seed));
+
+            // DEBUG:
+            sleep(load_time);
+            room--;
+            sum_weight += weight;
+
+            printf("Trucker %d  loaded up a box that weights %d to the truck, took %d units of time, room left:%d\n", (p->id), weight, load_time, room);
+        }
+
+        trip_time = RANDOM_WITHIN_RANGE(MIN_TRIP_TIME, MAX_TRIP_TIME, (p->seed));
+        printf("%s truck %d with load of %d units of mass departed, %s trip will take %d\n",
+               (room == 0) ? "Full" : "Not full",
+               p->id,
+               sum_weight,
+               (room == 0) ? "round" : "one way",
+               trip_time);
+
+        sleep(trip_time);
+    }
+
+    pthread_mutex_lock(&mutex);
+    printf("Trucker %d is finished\n", (p->id));
+    active_drivers--; // decrement active thread counter
+
+    // DEBUG:
+    // printf("active_drivers = %d\n", active_drivers);
+
+    if (active_drivers == 0)
+    {
+        close(nextToTrucks[READ_END]); // close read end of nextToTrucks
+    }
+    pthread_mutex_unlock(&mutex);
+
     pthread_exit(0);
 }
 
@@ -241,7 +332,11 @@ int main(int argc, char **argv)
     {
         driver_params[i].id = i;
         driver_params[i].seed = rand();
-        pthread_create(&driver_threads[i], NULL, driver_run, &driver_params[i]);
+        if (pthread_create(&driver_threads[i], NULL, driver_run, &driver_params[i]) != 0)
+        {
+            perror("Failed to create driver thread\n");
+            return 1;
+        }
     }
 
     // join all threads
@@ -260,12 +355,13 @@ int main(int argc, char **argv)
         pthread_join(driver_threads[i], NULL);
     }
 
+    // print final message
+    printf("Moving is finished!\n");
+
     // Cleanup
     pthread_mutex_destroy(&mutex);
-    pthread_cond_destroy(&box_available);
-
-    close(nextToTrucks[READ_END]);
-    close(nextToTrucks[WRITE_END]);
+    pthread_cond_destroy(&box_available_for_mover);
+    pthread_cond_destroy(&box_available_for_driver);
 
     return 0;
 }
