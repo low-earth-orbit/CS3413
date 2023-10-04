@@ -86,8 +86,7 @@ void *dweller_run(void *param)
 
     if (active_dwellers == 0)
     {
-        pthread_cond_signal(&box_available); // Signal movers that are waiting for condition to re-check conditions
-        close(houseFloor[WRITE_END]);        // close write end of houseFloor pipe after all dwellers are about to done
+        close(houseFloor[WRITE_END]); // close write end of houseFloor pipe after all dwellers are about to done
     }
     pthread_mutex_unlock(&mutex);
 
