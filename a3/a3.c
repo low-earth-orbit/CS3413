@@ -34,9 +34,8 @@ typedef struct
 } RunnerParam;
 
 // mutex
+pthread_cond_t box_available = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-// semaphore
-sem_t sem;
 
 // active thread counter
 int active_dwellers;
@@ -61,8 +60,9 @@ void *dweller_run(void *param)
     {
         interval = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_HOUSE_DWELLER, MAX_TIME_FOR_HOUSE_DWELLER, (p->seed));
         weight = RANDOM_WITHIN_RANGE(MIN_BOX_WEIGHT, MAX_BOX_WEIGHT, (p->seed));
+
         // TODO:
-        // sleep(interval);
+        sleep(interval);
 
         printf("House dweller %d created a box that weights %d in %d units of time\n", p->id, weight, interval);
 
@@ -75,26 +75,24 @@ void *dweller_run(void *param)
         {
             printf("Write to houseFloor pipe failed\n");
         }
-        // unlock mutex
-        pthread_mutex_unlock(&mutex);
 
-        pthread_mutex_lock(&mutex);
         box_to_move++;
+        pthread_cond_signal(&box_available); // signal to mover that box is available
         pthread_mutex_unlock(&mutex);
-
-        // Signal a box is placed
-        sem_post(&sem);
     }
 
     pthread_mutex_lock(&mutex);
     active_dwellers--;
-    pthread_mutex_unlock(&mutex);
 
     if (active_dwellers == 0)
     {
-        close(houseFloor[WRITE_END]); // close write end of houseFloor pipe after all dwellers are about to done
+        pthread_cond_signal(&box_available); // Signal movers that are waiting for condition to re-check conditions
+        close(houseFloor[WRITE_END]);        // close write end of houseFloor pipe after all dwellers are about to done
     }
-    printf("active_dwellers = %d\n", active_dwellers);
+    pthread_mutex_unlock(&mutex);
+
+    // DEBUG:
+    // printf("active_dwellers = %d\n", active_dwellers);
 
     printf("House dweller %d is done packing\n", p->id);
 
@@ -112,25 +110,24 @@ void *mover_run(void *param)
 
     while (1)
     {
-        // Check whether there are any active dwellers or boxes to move
-        // It is possible dwellers have sent all boxes but movers might still have boxes to move.
         pthread_mutex_lock(&mutex);
-        int finish_moving = active_dwellers == 0 && box_to_move == 0;
-        pthread_mutex_unlock(&mutex);
 
-        if (finish_moving)
+        // Dweller is still working, though no available box yet
+        while (box_to_move == 0 && active_dwellers > 0)
         {
+            pthread_cond_wait(&box_available, &mutex);
+        }
+
+        // Finished moving
+        if (box_to_move == 0 && active_dwellers == 0)
+        {
+            pthread_mutex_unlock(&mutex);
             printf("Mover %d is done moving boxes downstairs\n", p->id);
             break;
         }
 
-        sem_wait(&sem); // Wait until a box is placed
-
-        // lock mutex before reading from the pipe
-        pthread_mutex_lock(&mutex);
-
-        // read data
         status = read(houseFloor[READ_END], &weight, sizeof(weight));
+        box_to_move--;
 
         pthread_mutex_unlock(&mutex);
 
@@ -140,21 +137,19 @@ void *mover_run(void *param)
             break;
         }
 
-        if (status == 0)
+        if (status == 0) // EOF
         {
-            printf("Read EOF from houseFloor pipe\n");
             break;
         }
 
         interval = RANDOM_WITHIN_RANGE(MIN_TIME_FOR_MOVER, MAX_TIME_FOR_MOVER, (p->seed));
 
-        // TODO:
-        // sleep(interval);
+        // DEBUG:
+        sleep(interval);
 
         printf("Mover %d brought down a box that weights %d in %d units of time\n", p->id, weight, interval);
 
         pthread_mutex_lock(&mutex);
-        box_to_move--;
         box_to_drive++;
         pthread_mutex_unlock(&mutex);
     }
@@ -163,7 +158,8 @@ void *mover_run(void *param)
     active_movers--; // decrement active thread counter
     pthread_mutex_unlock(&mutex);
 
-    printf("active_movers = %d\n", active_movers);
+    // DEBUG:
+    // printf("active_movers = %d\n", active_movers);
 
     if (active_movers == 0)
     {
@@ -185,11 +181,6 @@ int main(int argc, char **argv)
     srand(time(NULL));
 
     // rest of the program follows
-
-    // Create the semaphore and initialize it to 0
-    // Initially, there is no box placed by house dweller
-    sem_init(&sem, 0, 0);
-
     // Create pipes
     if (pipe(houseFloor) == -1 || pipe(nextToTrucks) == -1)
     {
@@ -211,11 +202,6 @@ int main(int argc, char **argv)
     pthread_t dweller_threads[num_dwellers];
     pthread_t mover_threads[num_movers];
     pthread_t driver_threads[num_drivers];
-
-    // IDs
-    int dweller_ids[num_dwellers];
-    int mover_ids[num_movers];
-    int driver_ids[num_drivers];
 
     // thread parameters
     RunnerParam dweller_params[num_dwellers];
@@ -277,9 +263,8 @@ int main(int argc, char **argv)
 
     // Cleanup
     pthread_mutex_destroy(&mutex);
-    sem_destroy(&sem); // Destroy semaphore
-    close(houseFloor[READ_END]);
-    close(houseFloor[WRITE_END]);
+    pthread_cond_destroy(&box_available);
+
     close(nextToTrucks[READ_END]);
     close(nextToTrucks[WRITE_END]);
 
