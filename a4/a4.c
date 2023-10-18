@@ -180,16 +180,17 @@ int stop(Node **head)
 
 int main()
 {
-    Node *head = NULL;
+    // input task queue
+    Node *inputQueueHead = NULL;
 
-    int n;          // time quantum
+    int q;          // time quantum
     char user[101]; // assuming a maximum 100 char username
     char line[500]; // line buffer
 
     // Read time quantum
     if (fgets(line, sizeof(line), stdin) != NULL)
     {
-        sscanf(line, "%d", &n);
+        sscanf(line, "%d", &q);
     }
 
     // Skip title line
@@ -202,13 +203,32 @@ int main()
         int arrival, duration;
 
         sscanf(line, "%100s %c %d %d", user, &process, &arrival, &duration);
-        add(&head, user, process, arrival, duration);
+        add(&inputQueueHead, user, process, arrival, duration);
     }
 
     // Print the list
-    printList(head);
+    printList(inputQueueHead);
+
+    Node *inputQueueCurrent = inputQueueHead;
+    int t = 0; // CPU time counter
+
+    Node *schedulingQueueHead = NULL;
+
+    while (inputQueueCurrent != NULL)
+    {
+        printf("CPU time: %d\n", t);
+        // load job to scheduling queue if CPU time matches a job's arrival time
+        if (inputQueueCurrent->arrival == t)
+        {
+            add(&schedulingQueueHead, inputQueueCurrent->user, inputQueueCurrent->process, inputQueueCurrent->arrival, inputQueueCurrent->duration);
+            inputQueueCurrent = inputQueueCurrent->next;
+        }
+
+        t++; // increment CPU time
+    }
 
     // lastly, free memory
-    stop(&head);
+    stop(&inputQueueHead);
+    stop(&schedulingQueueHead);
     return 0;
 }
