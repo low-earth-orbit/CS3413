@@ -28,6 +28,12 @@ void add(Node **head, char *user, char process, int arrival, int duration)
 
     // assign user to new node
     newNode->user = strdup(user); // allocates memory upon copy string
+    if (newNode->user == NULL)
+    {
+        perror("strdup failed\n");
+        free(newNode);
+        return;
+    }
     newNode->process = process;
     newNode->arrival = arrival;
     newNode->duration = duration;
@@ -100,7 +106,7 @@ void delete(Node **head, char process)
 }
 
 /*
- * query that returns 0 or 1, if the element specified by the second parameter is in a linked list or not
+ * query that returns 0 or 1, if the user is included in the list or not
  */
 int contains(Node *head, char *user)
 {
@@ -123,10 +129,34 @@ int contains(Node *head, char *user)
 }
 
 /*
- * prints each element in the linked list to the console
+ * find the user in the list, then update duration (used as the time of the last job is finished for the user) for summary queue
  */
-void printList(Node *head)
+void findAndUpdate(Node *head, char *user, int duration)
 {
+    // if list is empty
+    if (head == NULL)
+    {
+        return;
+    }
+
+    while (head != NULL)
+    {
+        // if a match is found
+        if (strcmp(head->user, user) == 0)
+        {
+            head->duration = duration; // copy the new data over
+            return;
+        }
+        head = head->next;
+    }
+}
+
+/*
+ * prints summary queue
+ */
+void printSummary(Node *head)
+{
+    printf("Summary\n");
     // if list is empty
     if (head == NULL)
     {
@@ -137,7 +167,7 @@ void printList(Node *head)
     // traverse list
     while (head != NULL)
     {
-        printf("%s\t%c\t%d\t%d\n", head->user, head->process, head->arrival, head->duration);
+        printf("%s\t%d\n", head->user, head->duration);
         head = head->next;
     }
 }
@@ -199,6 +229,8 @@ int main()
     int t = 0; // CPU time counter
 
     Node *schedulingQueueHead = NULL;
+    Node *summaryQueueHead = NULL;
+
     Node *schedulingQueueCurrent = NULL;
 
     printf("Time Job\n");
@@ -214,6 +246,16 @@ int main()
             {
                 // Add to scheduling queue
                 add(&schedulingQueueHead, inputQueueHead->user, inputQueueHead->process, inputQueueHead->arrival, inputQueueHead->duration);
+
+                // Add or update to summary queue
+                if (contains(summaryQueueHead, inputQueueHead->user))
+                {
+                    findAndUpdate(summaryQueueHead, inputQueueHead->user, 0);
+                }
+                else
+                {
+                    add(&summaryQueueHead, inputQueueHead->user, ' ', 0, 0);
+                }
 
                 // If schedulingQueueCurrent is NULL, set it to point to schedulingQueueHead
                 // Only do this when the first job arrives
@@ -236,10 +278,11 @@ int main()
             // check if the current job is finished
             if (schedulingQueueCurrent->duration == 0)
             {
+                // Update summary
+                findAndUpdate(summaryQueueHead, schedulingQueueCurrent->user, t - 1);
+
                 // Remove finished job from the scheduling queue
                 delete (&schedulingQueueHead, schedulingQueueCurrent->process);
-
-                // TODO: Update summary
 
                 // The job from the queue head should be scheduled
                 schedulingQueueCurrent = schedulingQueueHead;
@@ -280,8 +323,11 @@ int main()
     }
     printf("\n");
 
+    printSummary(summaryQueueHead);
+
     // lastly, free memory
     stop(&inputQueueHead);
     stop(&schedulingQueueHead);
+    stop(&summaryQueueHead);
     return 0;
 }

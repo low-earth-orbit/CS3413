@@ -1,0 +1,32 @@
+Time Job
+1	-
+2	A
+3	A
+4	A
+5	B
+6	B
+7	A
+8	A
+9	D
+10	D
+11	C
+12	C
+13	C
+14	C
+15	C
+16	-
+17	-
+18	-
+19	-
+20	-
+21	-
+22	E
+23	E
+24	E
+25	-
+
+Summary
+Jim	8
+Mary	10
+Sue	15
+Hassan	24

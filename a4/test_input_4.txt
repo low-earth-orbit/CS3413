@@ -1,0 +1,6 @@
+5
+User	Process	Arrival	Duration
+Jake	K	1	10
+Sophia	L	2	5
+Mason	M	5	3
+Lily	N	10	1

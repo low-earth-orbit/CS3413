@@ -1,0 +1,6 @@
+2
+User	Process	Arrival	Duration
+Liam	G	1	1
+Noah	H	3	2
+Olivia	I	4	1
+Emma	J	6	2

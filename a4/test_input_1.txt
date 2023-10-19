@@ -1,0 +1,6 @@
+4
+User	Process	Arrival	Duration
+Alice	X	1	2
+Bob	Y	1	5
+Alice	Z	3	4
+Charlie	W	6	6

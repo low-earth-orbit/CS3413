@@ -1,0 +1,5 @@
+3
+User	Process	Arrival	Duration
+Mike	P	1	3
+Ella	Q	2	3
+Rosa	R	3	3
