@@ -56,6 +56,50 @@ void add(Node **head, char *user, char process, int arrival, int duration)
 }
 
 /*
+ * removes the first occurrance of the element specified by the second paramter from the linked list
+ */
+void delete(Node **head, char process)
+{
+    // if list is empty
+    if (*head == NULL)
+    {
+        return;
+    }
+
+    // store the head pointer for traversing
+    Node *current = *head;
+
+    // find the last element in the linked list
+    while (current != NULL)
+    {
+        // if a match is found
+        if (current->process == process)
+        {
+            if (current->prev != NULL)
+            {
+                current->prev->next = current->next;
+            }
+            else
+            {
+                *head = current->next;
+            }
+
+            if (current->next != NULL)
+            {
+                current->next->prev = current->prev;
+            }
+
+            // free up memory
+            free(current->user);
+            free(current);
+
+            return;
+        }
+        current = current->next;
+    }
+}
+
+/*
  * query that returns 0 or 1, if the element specified by the second parameter is in a linked list or not
  */
 int contains(Node *head, char *user)
@@ -99,63 +143,6 @@ void printList(Node *head)
 }
 
 /*
- * prints single node to the console
- */
-void printSingleNode(Node *node)
-{
-    // if node is empty
-    if (node == NULL)
-    {
-        printf("NULL\n");
-        return;
-    }
-
-    printf("%s\t%c\t%d\t%d\n", node->user, node->process, node->arrival, node->duration);
-}
-
-/*
- * prints each element and its prev and next elements in the linked list to the console
- */
-void printFullList(Node *head)
-{
-    // if list is empty
-    if (head == NULL)
-    {
-        printf("head is NULL. list may be empty.\n");
-        return;
-    }
-
-    printf("Value of head node: ");
-    printSingleNode(head);
-
-    // traverse list
-    while (head != NULL)
-    {
-        printf("User: %s; Prev: ", head->user);
-        if (head->prev != NULL)
-        {
-            printf("%s", head->prev->user);
-        }
-        else
-        {
-            printf("NULL");
-        }
-
-        printf("; Next: ");
-        if (head->next != NULL)
-        {
-            printf("%s", head->next->user);
-        }
-        else
-        {
-            printf("NULL");
-        }
-        printf(";\n");
-        head = head->next;
-    }
-}
-
-/*
  * frees all resources
  */
 int stop(Node **head)
@@ -193,6 +180,9 @@ int main()
         sscanf(line, "%d", &q);
     }
 
+    // counter for quantum
+    int qCount = q;
+
     // Skip title line
     fgets(line, sizeof(line), stdin);
 
@@ -202,30 +192,93 @@ int main()
         char process;
         int arrival, duration;
 
-        sscanf(line, "%100s %c %d %d", user, &process, &arrival, &duration);
+        sscanf(line, "%s %c %d %d", user, &process, &arrival, &duration);
         add(&inputQueueHead, user, process, arrival, duration);
     }
 
-    // Print the list
-    printList(inputQueueHead);
-
-    Node *inputQueueCurrent = inputQueueHead;
     int t = 0; // CPU time counter
 
     Node *schedulingQueueHead = NULL;
+    Node *schedulingQueueCurrent = NULL;
 
-    while (inputQueueCurrent != NULL)
+    printf("Time Job\n");
+
+    while (inputQueueHead != NULL || schedulingQueueHead != NULL)
     {
-        printf("CPU time: %d\n", t);
-        // load job to scheduling queue if CPU time matches a job's arrival time
-        if (inputQueueCurrent->arrival == t)
+        t++; // increment CPU time
+
+        while (inputQueueHead != NULL)
         {
-            add(&schedulingQueueHead, inputQueueCurrent->user, inputQueueCurrent->process, inputQueueCurrent->arrival, inputQueueCurrent->duration);
-            inputQueueCurrent = inputQueueCurrent->next;
+            // If the current job's arrival time matches the CPU time
+            if (inputQueueHead->arrival == t)
+            {
+                // Add to scheduling queue
+                add(&schedulingQueueHead, inputQueueHead->user, inputQueueHead->process, inputQueueHead->arrival, inputQueueHead->duration);
+
+                // If schedulingQueueCurrent is NULL, set it to point to schedulingQueueHead
+                // Only do this when the first job arrives
+                if (!schedulingQueueCurrent)
+                {
+                    schedulingQueueCurrent = schedulingQueueHead;
+                }
+
+                // Remove from input queue. The head is updated using the function.
+                delete (&inputQueueHead, inputQueueHead->process);
+            }
+            else
+            {
+                break;
+            }
         }
 
-        t++; // increment CPU time
+        if (schedulingQueueCurrent != NULL)
+        {
+            // check if the current job is finished
+            if (schedulingQueueCurrent->duration == 0)
+            {
+                // Remove finished job from the scheduling queue
+                delete (&schedulingQueueHead, schedulingQueueCurrent->process);
+
+                // TODO: Update summary
+
+                // The job from the queue head should be scheduled
+                schedulingQueueCurrent = schedulingQueueHead;
+
+                // reset quantum
+                qCount = q;
+            }
+            else if (qCount == 0)
+            {
+                // The next job should be scheduled
+                if (schedulingQueueCurrent->next)
+                    schedulingQueueCurrent = schedulingQueueCurrent->next;
+
+                // reset quantum
+                qCount = q;
+            }
+
+            if (schedulingQueueCurrent && schedulingQueueCurrent->duration > 0)
+            {
+                printf("%d\t%c\n", t, schedulingQueueCurrent->process);
+                schedulingQueueCurrent->duration--;
+            }
+            else
+            {
+                // catch the case schedulingQueueCurrent just becomes null
+                // or duration is 0
+                printf("%d\t-\n", t);
+            }
+
+            qCount--;
+        }
+        else
+        {
+            // No jobs in scheduling queue
+            // Print current time and -
+            printf("%d\t-\n", t);
+        }
     }
+    printf("\n");
 
     // lastly, free memory
     stop(&inputQueueHead);
