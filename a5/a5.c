@@ -116,7 +116,7 @@ void updateSummary(Job *queue, char *userName, int time)
     }
 }
 
-void simulate(void *param)
+void *simulate(void *param)
 {
     CpuThreadParam *p = (CpuThreadParam *)param;
 
@@ -184,7 +184,7 @@ void simulate(void *param)
     printf("%d\t-\n", cpu->time);
     pthread_exit(0);
 }
-void printSummary(void *param)
+void *printSummary(void *param)
 {
     PrintingThreadParam *p = (PrintingThreadParam *)param;
 
@@ -225,9 +225,16 @@ int main(int argc, char **argv)
     char buf3[100];
     char buf4[100];
     char buf5[100];
-    CPU cpu;
-    cpu.current = NULL;
-    cpu.time = 1;
+
+    // Initialize CPUs
+    CPU cpus[numCpu];
+    for (int i = 0; i < numCpu; i++)
+    {
+        cpus[i].current = NULL;
+        cpus[i].time = 1;
+        scanf("%d", &quantums[i]);
+    }
+
     char userName[100];
     char processName;
     int arrival;
@@ -277,9 +284,9 @@ int main(int argc, char **argv)
     for (int i = 0; i < numCpu; i++)
     {
         // Define cpu_thread_param[i]
-        cpu_thread_param[i].cpu = i;
+        cpu_thread_param[i].cpu = &cpus[i];
         cpu_thread_param[i].quantum = quantums[i];
-        cpu_thread_param[i].queue = queue;
+        cpu_thread_param[i].queue = &queue;
         cpu_thread_param[i].summary = summary;
 
         if (pthread_create(&cpu_threads[i], NULL, simulate, &cpu_thread_param[i]) != 0)
