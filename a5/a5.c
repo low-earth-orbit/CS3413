@@ -116,8 +116,15 @@ void updateSummary(Job *queue, char *userName, int time)
     }
 }
 
-void simulate(CPU *cpu, Job **queue, Job *summary, int quantum)
+void simulate(void *param)
 {
+    CpuThreadParam *p = (CpuThreadParam *)param;
+
+    CPU *cpu = p->cpu;
+    Job **queue = p->queue;
+    Job *summary = p->summary;
+    int quantum = p->quantum;
+
     int simulationStarted = 0;
     Job **runningQueue = (Job **)malloc(sizeof(Job *));
     *runningQueue = NULL;
@@ -175,16 +182,23 @@ void simulate(CPU *cpu, Job **queue, Job *summary, int quantum)
         cpu->time++;
     }
     printf("%d\t-\n", cpu->time);
+    pthread_exit(0);
 }
-void printSummary(Job *queue)
+void printSummary(void *param)
 {
+    PrintingThreadParam *p = (PrintingThreadParam *)param;
+
+    Job *queue = p->queue;
+
     printf("\nSummary\n");
     while (queue != NULL)
     {
         printf("%s\t%d\n", queue->userName, queue->last_job);
         queue = queue->next;
     }
+    pthread_exit(0);
 }
+
 int main(int argc, char **argv)
 {
     int numCpu;           // number of CPUs
@@ -263,14 +277,17 @@ int main(int argc, char **argv)
     for (int i = 0; i < numCpu; i++)
     {
         // Define cpu_thread_param[i]
+        cpu_thread_param[i].cpu = i;
+        cpu_thread_param[i].quantum = quantums[i];
+        cpu_thread_param[i].queue = queue;
+        cpu_thread_param[i].summary = summary;
+
         if (pthread_create(&cpu_threads[i], NULL, simulate, &cpu_thread_param[i]) != 0)
         {
             perror("Failed to create CPU thread\n");
             return 1;
         }
     }
-
-    // simulate(&cpu, &queue, summary);
 
     // Join all CPU threads
     for (int i = 0; i < numCpu; i++)
@@ -281,13 +298,12 @@ int main(int argc, char **argv)
     pthread_t printing_thread;
     PrintingThreadParam priting_thread_param;
     // Define printing_thread_param
+    priting_thread_param.queue = summary;
     if (pthread_create(&printing_thread, NULL, printSummary, &priting_thread_param) != 0)
     {
         perror("Failed to create printing thread\n");
         return 1;
     }
-
-    // printSummary(summary);
 
     // Join printing thread
     pthread_join(printing_thread, NULL);
