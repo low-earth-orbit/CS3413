@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h> // for pthread_create(), pthread_join(), etc.
 
 typedef struct _node
 {
@@ -18,6 +19,21 @@ typedef struct cpu
     Job *current;
     int time;
 } CPU;
+
+// CPU thread parameter
+typedef struct
+{
+    CPU *cpu;
+    Job **queue;
+    Job *summary;
+    int quantum;
+} CpuThreadParam;
+
+// Printing thread parameter
+typedef struct
+{
+    Job *queue;
+} PrintingThreadParam;
 
 void enqueue(Job **queue, Job *job)
 {
@@ -241,7 +257,40 @@ int main(int argc, char **argv)
     }
     /* For debug - End */
 
+    // Create CPU threads
+    pthread_t cpu_threads[numCpu];
+    CpuThreadParam cpu_thread_param[numCpu];
+    for (int i = 0; i < numCpu; i++)
+    {
+        // Define cpu_thread_param[i]
+        if (pthread_create(&cpu_threads[i], NULL, simulate, &cpu_thread_param[i]) != 0)
+        {
+            perror("Failed to create CPU thread\n");
+            return 1;
+        }
+    }
+
     // simulate(&cpu, &queue, summary);
+
+    // Join all CPU threads
+    for (int i = 0; i < numCpu; i++)
+    {
+        pthread_join(cpu_threads[i], NULL);
+    }
+
+    pthread_t printing_thread;
+    PrintingThreadParam priting_thread_param;
+    // Define printing_thread_param
+    if (pthread_create(&printing_thread, NULL, printSummary, &priting_thread_param) != 0)
+    {
+        perror("Failed to create printing thread\n");
+        return 1;
+    }
+
     // printSummary(summary);
+
+    // Join printing thread
+    pthread_join(printing_thread, NULL);
+
     return 0;
 }
