@@ -7,6 +7,7 @@ typedef struct _node
     int arrivalTime;
     int duration;
     int last_job;
+    int affinity;
     char processName;
     char *userName;
     struct _node *next;
@@ -26,6 +27,7 @@ void enqueue(Job **queue, Job *job)
         (*queue)->next = NULL;
         (*queue)->arrivalTime = job->arrivalTime;
         (*queue)->duration = job->duration;
+        (*queue)->affinity = job->affinity;
         (*queue)->last_job = job->last_job;
         (*queue)->processName = job->processName;
         (*queue)->userName = strdup(job->userName);
@@ -40,6 +42,7 @@ void enqueue(Job **queue, Job *job)
     temp->next->next = NULL;
     temp->next->arrivalTime = job->arrivalTime;
     temp->next->duration = job->duration;
+    temp->next->affinity = job->affinity;
     temp->next->last_job = job->last_job;
     temp->next->processName = job->processName;
     temp->next->userName = strdup(job->userName);
@@ -172,6 +175,7 @@ int main(int argc, char **argv)
     scanf("%i", &numCpu); // Scan to get the number of CPU
     int quantums[numCpu]; // Create an array to store quantum for CPU
 
+    /* For debug - Start */
     for (int i = 0; i < numCpu; i++)
     {
         scanf("%d", &quantums[i]);
@@ -182,6 +186,7 @@ int main(int argc, char **argv)
     {
         printf("quantums[%d] = %d\n", i, quantums[i]);
     }
+    /* For debug - End */
 
     Job *summary = NULL;
     Job *queue = NULL;
@@ -210,6 +215,7 @@ int main(int argc, char **argv)
             newJob->processName = processName;
             newJob->arrivalTime = arrival;
             newJob->duration = duration;
+            newJob->affinity = affinity;
             newJob->next = NULL;
             enqueue(&summary, newJob);
             free(newJob->userName);
@@ -220,11 +226,21 @@ int main(int argc, char **argv)
         newJob->processName = processName;
         newJob->arrivalTime = arrival;
         newJob->duration = duration;
+        newJob->affinity = affinity;
         newJob->next = NULL;
         enqueue(&queue, newJob);
         free(newJob->userName);
         free(newJob);
     }
+
+    /* For debug - Start */
+    while (queue != NULL)
+    {
+        printf("%s\t%c\t%d\t%d\t%d\n", queue->userName, queue->processName, queue->arrivalTime, queue->duration, queue->affinity);
+        queue = queue->next;
+    }
+    /* For debug - End */
+
     // simulate(&cpu, &queue, summary);
     // printSummary(summary);
     return 0;
