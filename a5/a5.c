@@ -34,15 +34,7 @@ typedef struct
 // Mutex for input queue
 pthread_mutex_t queue_mutex;
 
-typedef struct _buffer
-{
-    Job *job;
-    int cpu_id;
-    int time;
-} Buffer;
-
-Buffer printBuffer[1000];
-int buffer_index = 0;
+char printBuffer[100];
 
 pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
 int global_time = 1;
@@ -145,39 +137,19 @@ void *print(void *param)
 {
     int total_cpus = *(int *)param;
     char jobs[total_cpus];
-    
-    for (int i = 0; i < total_cpus; i++)
+    for (int j = 0; j < 20; j++)
     {
-        sem_wait(&all_cpus_done);
-        // printf("[PRINT] Received signal from CPU%d.\n", i);
-    }
-
-    for (int i = 0; i < 20; i++)
-    {
-        // printf("Print function is running; time = %d\n", global_time);
-
         for (int i = 0; i < total_cpus; i++)
         {
-            if (i < buffer_index)
-            {
-                Buffer entry = printBuffer[i];
-                jobs[entry.cpu_id] = entry.job->processName;
-            }
-            else
-            {
-                jobs[i] = '-'; // no job for this CPU
-            }
+            sem_wait(&all_cpus_done);
+            // printf("[PRINT] Received signal from CPU%d.\n", i);
         }
-
-        // Reset buffer index and finished count
-        buffer_index = 0;
-        finished_cpu_count = 0;
 
         // Print the jobs for the current time unit
         printf("Time: %d\t", global_time);
         for (int i = 0; i < total_cpus; i++)
         {
-            printf("CPU%d: %c\t", i, jobs[i]);
+            printf("CPU%d: %c\t", i, printBuffer[i]);
         }
         printf("\n");
 
@@ -254,14 +226,6 @@ void *simulate(void *param)
             // printf("%d\t%c\n", cpu->time, cpu->current->processName);
             cpu->current->duration--;
 
-            // Place job to print buffer
-            pthread_mutex_lock(&print_mutex);
-            printBuffer[buffer_index].job = cpu->current;
-            printBuffer[buffer_index].cpu_id = id;
-            printBuffer[buffer_index].time = cpu->time;
-            buffer_index++;
-            pthread_mutex_unlock(&print_mutex);
-
             if (cpu->current->duration == 0)
             {
                 updateSummary(summary, cpu->current->userName, cpu->time);
@@ -283,6 +247,10 @@ void *simulate(void *param)
                 }
             }
         }
+
+        // Place job to print buffer
+        printBuffer[id] = (cpu->current ? cpu->current->processName : '-');
+
         sem_post(&all_cpus_done);
         // printf("[SIMULATE CPU%d] Finished time unit %d and signaled PRINT.\n", id, cpu->time);
 
