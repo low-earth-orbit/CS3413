@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <pthread.h> // for pthread_create(), pthread_join(), etc.
+#include <pthread.h>
+#include <semaphore.h>
 
 typedef struct _node
 {
@@ -44,9 +45,15 @@ Buffer printBuffer[1000];
 int buffer_index = 0;
 
 pthread_mutex_t print_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t print_cond = PTHREAD_COND_INITIALIZER;
 int global_time = 1;
 int finished_cpu_count = 0;
+pthread_mutex_t jobs_done_mutex;
+
+sem_t print_sem;
+sem_t cpu_sem;
+
+sem_t all_cpus_done; // Signal from all CPUs to print
+sem_t print_done;    // Signal from print to all CPUs
 
 void enqueue(Job **queue, Job *job)
 {
@@ -134,52 +141,53 @@ void updateSummary(Job *queue, char *userName, int time)
 
 void *print(void *param)
 {
-    int total_cpus = *(int *)param; // assuming param is the number of CPUs
-    char jobs[total_cpus];          // to temporarily hold jobs for each CPU
+    // int total_cpus = *(int *)param; // assuming param is the number of CPUs
+    // char jobs[total_cpus];          // to temporarily hold jobs for each CPU
 
-    int currentTime = 1;
+    // for (int i = 0; i < total_cpus; i++)
+    // {
+    //     sem_wait(&all_cpus_done);
+    // }
 
-    while (1)
-    {
-        // Wait for all CPU threads to finish a unit of execution
-        pthread_mutex_lock(&print_mutex);
-        while (finished_cpu_count < total_cpus)
-        {
-            pthread_cond_wait(&print_cond, &print_mutex);
-        }
+    // int currentTime = 1;
 
-        // Get the jobs for the current time unit
-        for (int i = 0; i < total_cpus; i++)
-        {
-            if (i < buffer_index)
-            {
-                Buffer entry = printBuffer[i];
-                jobs[entry.cpu_id] = entry.job->processName;
-            }
-            else
-            {
-                jobs[i] = '-'; // no job for this CPU
-            }
-        }
+    // for (int i = 0; i < 20; i++)
+    // {
+    //     // Wait for all CPU threads to finish a unit of execution
 
-        // Reset buffer index and finished count
-        buffer_index = 0;
-        finished_cpu_count = 0;
+    //     // Get the jobs for the current time unit
+    //     for (int i = 0; i < total_cpus; i++)
+    //     {
+    //         if (i < buffer_index)
+    //         {
+    //             Buffer entry = printBuffer[i];
+    //             jobs[entry.cpu_id] = entry.job->processName;
+    //         }
+    //         else
+    //         {
+    //             jobs[i] = '-'; // no job for this CPU
+    //         }
+    //     }
 
-        pthread_mutex_unlock(&print_mutex);
+    //     // Reset buffer index and finished count
+    //     buffer_index = 0;
+    //     finished_cpu_count = 0;
 
-        // Print the jobs for the current time unit
-        printf("Time: %d\t", currentTime);
-        for (int i = 0; i < total_cpus; i++)
-        {
-            printf("CPU%d: %c\t", i, jobs[i]);
-        }
-        printf("\n");
+    //     // Print the jobs for the current time unit
+    //     printf("Time: %d\t", currentTime);
+    //     for (int i = 0; i < total_cpus; i++)
+    //     {
+    //         printf("CPU%d: %c\t", i, jobs[i]);
+    //     }
+    //     printf("\n");
 
-        // Signal all CPU threads to continue
-        pthread_cond_broadcast(&print_cond);
-        currentTime++;
-    }
+    //     // Signal all CPU threads to continue
+    //     for (int i = 0; i < total_cpus; i++)
+    //     {
+    //         sem_post(&print_done);
+    //     }
+    //     currentTime++;
+    // }
 
     pthread_exit(0);
 }
@@ -250,6 +258,15 @@ void *simulate(void *param)
             printBuffer[buffer_index].time = cpu->time;
             buffer_index++;
             pthread_mutex_unlock(&print_mutex);
+
+            // // Signal print function
+            // sem_post(&print_sem);
+
+            // // Wait for print function
+            // sem_wait(&cpu_sem);
+
+            // sem_post(&all_cpus_done);
+            // sem_wait(&print_done);
 
             if (cpu->current->duration == 0)
             {
@@ -374,12 +391,12 @@ int main(int argc, char **argv)
     }
 
     // Create prining thread before creating CPU threads
-    // pthread_t printing_thread;
-    // if (pthread_create(&printing_thread, NULL, print, NULL) != 0)
-    // {
-    //     perror("Failed to create printing thread");
-    //     return 1;
-    // }
+    pthread_t printing_thread;
+    if (pthread_create(&printing_thread, NULL, print, &numCpu) != 0)
+    {
+        perror("Failed to create printing thread");
+        return 1;
+    }
 
     // init mutext for input queue
     if (pthread_mutex_init(&queue_mutex, NULL) != 0)
@@ -387,6 +404,13 @@ int main(int argc, char **argv)
         perror("Failed to initialize queue_mutex");
         return 1; // or handle the error as appropriate
     }
+    pthread_mutex_init(&jobs_done_mutex, NULL);
+
+    sem_init(&print_sem, 0, 0);
+    sem_init(&cpu_sem, 0, numCpu);
+
+    sem_init(&all_cpus_done, 0, 0); // Initialized to 0
+    sem_init(&print_done, 0, 0);    // Initialized to 0
 
     // Create CPU threads
     pthread_t cpu_threads[numCpu];
@@ -414,7 +438,7 @@ int main(int argc, char **argv)
     }
 
     // Join printing thread
-    // pthread_join(printing_thread, NULL);
+    pthread_join(printing_thread, NULL);
 
     // Print the summary in the main thread
     // This is different than what printing thread prints
@@ -436,9 +460,11 @@ int main(int argc, char **argv)
         free(temp->userName);
         free(temp);
     }
-    // Destory mutexes
+    // Destory mutex and semaphore
     pthread_mutex_destroy(&queue_mutex);
     pthread_mutex_destroy(&print_mutex);
+    sem_destroy(&print_sem);
+    sem_destroy(&cpu_sem);
 
     return 0;
 }
