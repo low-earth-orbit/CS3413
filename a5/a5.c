@@ -131,11 +131,11 @@ void *print(void *param)
 {
     int print_time = 1;
 
-    int total_cpus = *(int *)param;
-    // printf("Total cpus in print thread: %d\n", total_cpus);
-    char jobs[total_cpus];
+    // int numCpu = *(int *)param;
+    // printf("Total cpus in print thread: %d\n", numCpu);
+    char jobs[numCpu];
     printf("Time\t");
-    for (int i = 0; i < total_cpus; i++)
+    for (int i = 0; i < numCpu; i++)
     {
         printf("CPU%d\t", i);
     }
@@ -143,46 +143,36 @@ void *print(void *param)
 
     while (1)
     {
-        for (int i = 0; i < total_cpus; i++)
+        for (int i = 0; i < numCpu; i++)
         {
             sem_wait(&all_cpus_done);
-            // printf("[PRINT] Received signal from CPU%d.\n", i);
         }
-        pthread_mutex_lock(&cpus_done_mutex);
-
-        // Print the jobs for the current time unit
-
-        // printf("In Printing Thread time%d, printBuffer: %s\n", print_time, printBuffer);
 
         printf("%d\t", print_time);
-        for (int i = 0; i < total_cpus; i++)
+        for (int i = 0; i < numCpu; i++)
         {
             pthread_mutex_lock(&queue_mutex);
             printf("%c\t", printBuffer[i]);
             pthread_mutex_unlock(&queue_mutex);
-            usleep(100000); // Sleep for 0.1 seconds
         }
         printf("\n");
 
         print_time++; // Increment the time
 
         // Signal all CPU threads to continue
-        for (int i = 0; i < total_cpus; i++)
+        for (int i = 0; i < numCpu; i++)
         {
             // printf("[PRINT] Sending signal to CPU%d to proceed.\n", i);
             sem_post(&print_done);
         }
 
-        // printf("Here 3 completed_cpus = %d\n", completed_cpus);
-        if (completed_cpus >= total_cpus)
+        pthread_mutex_lock(&cpus_done_mutex);
+        if (completed_cpus >= numCpu)
         {
             pthread_mutex_unlock(&cpus_done_mutex);
-            usleep(100000); // Sleep for 0.1 seconds
-
             break;
         }
         pthread_mutex_unlock(&cpus_done_mutex);
-        usleep(100000); // Sleep for 0.1 seconds
     }
     pthread_exit(0);
 }
@@ -196,18 +186,11 @@ void *simulate(void *param)
     Job *summary = p->summary;
     int quantum = p->quantum;
     int id = p->id;
-    int simulationStarted = 0;
+    int simulationStarted = 1;
     Job **runningQueue = (Job **)malloc(sizeof(Job *));
     *runningQueue = NULL;
 
     int firstJob = 0;
-
-    // Job *current = *runningQueue;
-    // while (current != NULL)
-    // {
-    //     printf("Running queue content loaded CPU%d\t%s\t%c\t%d\t%d\t%d\n", id, current->userName, current->processName, current->arrivalTime, current->duration, current->affinity);
-    //     current = current->next;
-    // }
 
     do
     {
@@ -243,14 +226,12 @@ void *simulate(void *param)
         }
 
         pthread_mutex_unlock(&queue_mutex);
-        usleep(100000); // Sleep for 0.1 seconds
 
         // set buffer to '-' whatever
         pthread_mutex_lock(&queue_mutex);
         printBuffer[id] = '-';
         // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
         pthread_mutex_unlock(&queue_mutex);
-        usleep(100000); // Sleep for 0.1 seconds
 
         if (*runningQueue != NULL)
         {
@@ -258,6 +239,7 @@ void *simulate(void *param)
             if (cpu->current == NULL)
             {
                 cpu->current = *runningQueue;
+                simulationStarted = cpu->time;
             }
 
             if (cpu->current != NULL)
@@ -270,7 +252,6 @@ void *simulate(void *param)
                 // printf("CPU%d\t%d\t%c\n", id, cpu->time, cpu->current->processName);
                 // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
                 pthread_mutex_unlock(&queue_mutex);
-                usleep(100000); // Sleep for 0.1 seconds
 
                 cpu->current->duration--;
                 if (cpu->current->duration == 0)
@@ -298,25 +279,25 @@ void *simulate(void *param)
         sem_post(&all_cpus_done);
 
         // printf("[SIMULATE CPU%d] Received signal from PRINT to proceed with time unit %d.\n", id, cpu->time + 1);
+
+        if (*runningQueue == NULL && *queue == NULL)
+        {
+            // set buffer to '-' whatever
+            pthread_mutex_lock(&queue_mutex);
+            printBuffer[id] = '-';
+            // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
+            pthread_mutex_unlock(&queue_mutex);
+
+            pthread_mutex_lock(&cpus_done_mutex);
+            completed_cpus++;
+            pthread_mutex_unlock(&cpus_done_mutex);
+
+            sem_post(&all_cpus_done);
+        }
     } while (*runningQueue != NULL || *queue != NULL);
 
     sem_wait(&print_done);
 
-    // set buffer to '-' whatever
-    pthread_mutex_lock(&queue_mutex);
-    printBuffer[id] = '-';
-    // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
-    pthread_mutex_unlock(&queue_mutex);
-    usleep(100000); // Sleep for 0.1 seconds
-
-    pthread_mutex_lock(&cpus_done_mutex);
-    completed_cpus++;
-    pthread_mutex_unlock(&cpus_done_mutex);
-    usleep(100000); // Sleep for 0.1 seconds
-
-    sem_post(&all_cpus_done);
-
-    // printf("Here!\n");
     pthread_exit(0);
 }
 
@@ -343,7 +324,7 @@ int main(int argc, char **argv)
     char buf4[100];
     char buf5[100];
 
-    // Initialize CPUs
+    // Create CPUs
     CPU cpus[numCpu];
     for (int i = 0; i < numCpu; i++)
     {
@@ -399,7 +380,7 @@ int main(int argc, char **argv)
     }
     printBuffer[numCpu] = '\0';
 
-    // Create prining thread before creating CPU threads
+    // Create printing thread before creating CPU threads
     pthread_t printing_thread;
     if (pthread_create(&printing_thread, NULL, print, &numCpu) != 0)
     {
@@ -435,7 +416,6 @@ int main(int argc, char **argv)
         pthread_join(cpu_threads[i], NULL);
     }
 
-    // printf("Here in main!");
     // Print the summary in the main thread
     // This is different than what printing thread prints
     printSummary(summary);
