@@ -3,6 +3,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <unistd.h>
 
 typedef struct _node
 {
@@ -133,6 +134,13 @@ void *print(void *param)
     int total_cpus = *(int *)param;
     // printf("Total cpus in print thread: %d\n", total_cpus);
     char jobs[total_cpus];
+    printf("Time\t");
+    for (int i = 0; i < total_cpus; i++)
+    {
+        printf("CPU%d\t", i);
+    }
+    printf("\n");
+
     while (1)
     {
         for (int i = 0; i < total_cpus; i++)
@@ -145,22 +153,26 @@ void *print(void *param)
         if (completed_cpus >= total_cpus)
         {
             pthread_mutex_unlock(&cpus_done_mutex);
+            usleep(100000); // Sleep for 0.1 seconds
+
             break;
         }
         pthread_mutex_unlock(&cpus_done_mutex);
+        usleep(100000); // Sleep for 0.1 seconds
 
         // Print the jobs for the current time unit
 
         // printf("In Printing Thread time%d, printBuffer: %s\n", print_time, printBuffer);
 
-        // printf("%d\t", print_time);
-        // for (int i = 0; i < total_cpus; i++)
-        // {
-        //     pthread_mutex_lock(&queue_mutex);
-        //     printf("%c\t", printBuffer[i]);
-        //     pthread_mutex_unlock(&queue_mutex);
-        // }
-        // printf("\n");
+        printf("%d\t", print_time);
+        for (int i = 0; i < total_cpus; i++)
+        {
+            pthread_mutex_lock(&queue_mutex);
+            printf("%c\t", printBuffer[i]);
+            pthread_mutex_unlock(&queue_mutex);
+            usleep(100000); // Sleep for 0.1 seconds
+        }
+        printf("\n");
 
         print_time++; // Increment the time
 
@@ -230,12 +242,14 @@ void *simulate(void *param)
         }
 
         pthread_mutex_unlock(&queue_mutex);
+        usleep(100000); // Sleep for 0.1 seconds
 
         // set buffer to '-' whatever
         pthread_mutex_lock(&queue_mutex);
         printBuffer[id] = '-';
         // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
         pthread_mutex_unlock(&queue_mutex);
+        usleep(100000); // Sleep for 0.1 seconds
 
         if (*runningQueue != NULL)
         {
@@ -252,9 +266,10 @@ void *simulate(void *param)
                 // Place job to print buffer
                 pthread_mutex_lock(&queue_mutex);
                 printBuffer[id] = cpu->current->processName;
-                printf("CPU%d\t%d\t%c\n", id, cpu->time, cpu->current->processName);
+                // printf("CPU%d\t%d\t%c\n", id, cpu->time, cpu->current->processName);
                 // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
                 pthread_mutex_unlock(&queue_mutex);
+                usleep(100000); // Sleep for 0.1 seconds
 
                 cpu->current->duration--;
                 if (cpu->current->duration == 0)
@@ -287,8 +302,9 @@ void *simulate(void *param)
     pthread_mutex_lock(&cpus_done_mutex);
     completed_cpus++;
     pthread_mutex_unlock(&cpus_done_mutex);
+    usleep(100000); // Sleep for 0.1 seconds
 
-    printf("Here!\n");
+    // printf("Here!\n");
     pthread_exit(0);
 }
 
@@ -407,7 +423,7 @@ int main(int argc, char **argv)
         pthread_join(cpu_threads[i], NULL);
     }
 
-    printf("Here in main!");
+    // printf("Here in main!");
     // Print the summary in the main thread
     // This is different than what printing thread prints
     printSummary(summary);
