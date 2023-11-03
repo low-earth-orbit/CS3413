@@ -32,18 +32,17 @@ typedef struct
     int id;
 } CpuThreadParam;
 
-char *printBuffer;
+char *printBuffer; // The print buffer
 
-sem_t cpu_sem[100];                                       // CPU semaphore array
-sem_t print_done[100];                                    // Signal from print to CPU
+sem_t cpu_done[100];   // CPU semaphore array
+sem_t print_done[100]; // Signal from print to CPU
+
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of print buffer
-pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // mutex to protect r/w of input queue among CPU threads
-pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of input queue among CPU threads
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // mutex to protect r/w of input queue
+pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of input cpu status array
 
-int cpu_status[100];
-int completed_cpus = 0;
-int numCpu = 0;
-int isDone = 0;
+int cpu_status[100]; // Array to store CPU stauts, 1 is running, 0 is finished
+int numCpu = 0;      // Number of CPUs
 
 void enqueue(Job **queue, Job *job)
 {
@@ -160,24 +159,17 @@ void *print(void *param)
         for (int i = 0; i < numCpu; i++)
         {
             if (cpu_status[i] != 0)
-                sem_wait(&cpu_sem[i]);
+                sem_wait(&cpu_done[i]);
         }
 
         printf("%d\t", print_time);
         for (int i = 0; i < numCpu; i++)
         {
-            pthread_mutex_lock(&buffer_mutex);
-            printf("%c\t", printBuffer[i]);
-            pthread_mutex_unlock(&buffer_mutex);
+            printf("%c\t", printBuffer[i]); // Print thread is the only thread that runs this statement; no mutex needed
         }
         printf("\n");
 
         print_time++; // Increment the time
-
-        if (completed_cpus >= numCpu)
-        {
-            break;
-        }
 
         for (int i = 0; i < numCpu; i++)
         {
@@ -277,7 +269,7 @@ void *simulate(void *param)
         }
 
         cpu->time++;
-        sem_post(&cpu_sem[id]);
+        sem_post(&cpu_done[id]);
         // printf("CPU%d\n", id);
 
         sem_wait(&print_done[id]);
@@ -292,7 +284,9 @@ void *simulate(void *param)
     printBuffer[id] = '-';
     pthread_mutex_unlock(&buffer_mutex);
 
-    sem_post(&cpu_sem[id]);
+    free(runningQueue);
+
+    sem_post(&cpu_done[id]);
 
     pthread_exit(0);
 }
@@ -355,6 +349,8 @@ int main(int argc, char **argv)
             newJob->next = NULL;
             newJob->affinity = affinity;
             enqueue(&summary, newJob);
+            free(newJob->userName);
+            free(newJob);
         }
         newJob = (Job *)malloc(sizeof(Job));
         newJob->userName = strdup(userName);
@@ -364,11 +360,13 @@ int main(int argc, char **argv)
         newJob->affinity = affinity;
         newJob->next = NULL;
         enqueue(&queue, newJob);
+        free(newJob->userName);
+        free(newJob);
     }
     // Initialize CPU semaphore
     for (int i = 0; i < numCpu; i++)
     {
-        sem_init(&cpu_sem[i], 0, 0);
+        sem_init(&cpu_done[i], 0, 0);
         sem_init(&print_done[i], 0, 0);
         cpu_status[i] = 1;
     }
@@ -435,6 +433,17 @@ int main(int argc, char **argv)
     // This is different than what printing thread prints
     printSummary(summary);
 
+    // Destory mutex and semaphore
+    pthread_mutex_destroy(&buffer_mutex);
+    pthread_mutex_destroy(&status_mutex);
+    pthread_mutex_destroy(&queue_mutex);
+
+    for (int i = 0; i < numCpu; i++)
+    {
+        sem_destroy(&cpu_done[i]);
+        sem_destroy(&print_done[i]);
+    }
+
     // Free memory
     Job *temp;
     while (queue)
@@ -451,18 +460,11 @@ int main(int argc, char **argv)
         free(temp->userName);
         free(temp);
     }
-    // Destory mutex and semaphore
-    pthread_mutex_destroy(&buffer_mutex);
-
-    for (int i = 0; i < numCpu; i++)
-    {
-        sem_destroy(&cpu_sem[i]);
-        sem_destroy(&print_done[i]);
-    }
 
     free(cpus);
     free(cpu_thread_param);
     free(quantums);
+    free(printBuffer);
 
     return 0;
 }
