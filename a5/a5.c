@@ -32,16 +32,15 @@ typedef struct
     int id;
 } CpuThreadParam;
 
-// Mutex for input queue
-pthread_mutex_t queue_mutex;
-
 char *printBuffer;
 
-sem_t all_cpus_done; // Signal from all CPUs to print
-sem_t print_done;    // Signal from print to all CPUs
-pthread_mutex_t cpus_done_mutex = PTHREAD_MUTEX_INITIALIZER;
+sem_t cpu_sem[100];                                       // CPU semaphore array
+sem_t print_done[100];                                    // Signal from print to CPU
+pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of print buffer
+pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // mutex to protect r/w of input queue among CPU threads
 int completed_cpus = 0;
 int numCpu = 0;
+int isDone = 0;
 
 void enqueue(Job **queue, Job *job)
 {
@@ -131,8 +130,6 @@ void *print(void *param)
 {
     int print_time = 1;
 
-    // int numCpu = *(int *)param;
-    // printf("Total cpus in print thread: %d\n", numCpu);
     char jobs[numCpu];
     printf("Time\t");
     for (int i = 0; i < numCpu; i++)
@@ -145,34 +142,29 @@ void *print(void *param)
     {
         for (int i = 0; i < numCpu; i++)
         {
-            sem_wait(&all_cpus_done);
+            sem_wait(&cpu_sem[i]);
         }
 
         printf("%d\t", print_time);
         for (int i = 0; i < numCpu; i++)
         {
-            pthread_mutex_lock(&queue_mutex);
+            pthread_mutex_lock(&buffer_mutex);
             printf("%c\t", printBuffer[i]);
-            pthread_mutex_unlock(&queue_mutex);
+            pthread_mutex_unlock(&buffer_mutex);
         }
         printf("\n");
 
         print_time++; // Increment the time
 
-        // Signal all CPU threads to continue
-        for (int i = 0; i < numCpu; i++)
-        {
-            // printf("[PRINT] Sending signal to CPU%d to proceed.\n", i);
-            sem_post(&print_done);
-        }
-
-        pthread_mutex_lock(&cpus_done_mutex);
         if (completed_cpus >= numCpu)
         {
-            pthread_mutex_unlock(&cpus_done_mutex);
             break;
         }
-        pthread_mutex_unlock(&cpus_done_mutex);
+
+        for (int i = 0; i < numCpu; i++)
+        {
+            sem_post(&print_done[i]);
+        }
     }
     pthread_exit(0);
 }
@@ -194,13 +186,9 @@ void *simulate(void *param)
 
     do
     {
-        sem_wait(&print_done);
-
-        // printf("In CPU%d \n", id);
         // Lock the read process from input queue to CPU thread
         // Load input queue to local running queue
         pthread_mutex_lock(&queue_mutex);
-
         // Use a temp pointer for traversal without modifying the queue.
         Job *tempPtr = *queue;
 
@@ -224,18 +212,15 @@ void *simulate(void *param)
             // Until every item for the unit of time has been loaded
             tempPtr = tempPtr->next;
         }
-
         pthread_mutex_unlock(&queue_mutex);
 
         // set buffer to '-' whatever
-        pthread_mutex_lock(&queue_mutex);
+        pthread_mutex_lock(&buffer_mutex);
         printBuffer[id] = '-';
-        // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
-        pthread_mutex_unlock(&queue_mutex);
+        pthread_mutex_unlock(&buffer_mutex);
 
         if (*runningQueue != NULL)
         {
-            // printf("CPU%d time = %d\n", id, cpu->time);
             if (cpu->current == NULL)
             {
                 cpu->current = *runningQueue;
@@ -244,14 +229,10 @@ void *simulate(void *param)
 
             if (cpu->current != NULL)
             {
-                // printf("CPU%d\t%d\t%c\n", id, cpu->time, cpu->current->processName);
-
                 // Place job to print buffer
-                pthread_mutex_lock(&queue_mutex);
+                pthread_mutex_lock(&buffer_mutex);
                 printBuffer[id] = cpu->current->processName;
-                // printf("CPU%d\t%d\t%c\n", id, cpu->time, cpu->current->processName);
-                // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
-                pthread_mutex_unlock(&queue_mutex);
+                pthread_mutex_unlock(&buffer_mutex);
 
                 cpu->current->duration--;
                 if (cpu->current->duration == 0)
@@ -275,28 +256,27 @@ void *simulate(void *param)
         }
 
         cpu->time++;
-        // printf("[SIMULATE CPU%d] Finished time unit %d and signaled PRINT.\n", id, cpu->time);
-        sem_post(&all_cpus_done);
-
-        // printf("[SIMULATE CPU%d] Received signal from PRINT to proceed with time unit %d.\n", id, cpu->time + 1);
-
-        if (*runningQueue == NULL && *queue == NULL)
-        {
-            // set buffer to '-' whatever
-            pthread_mutex_lock(&queue_mutex);
-            printBuffer[id] = '-';
-            // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
-            pthread_mutex_unlock(&queue_mutex);
-
-            pthread_mutex_lock(&cpus_done_mutex);
-            completed_cpus++;
-            pthread_mutex_unlock(&cpus_done_mutex);
-
-            sem_post(&all_cpus_done);
-        }
+        sem_post(&cpu_sem[id]);
+        printf("In CPU%d (6)\n", id);
+        sem_wait(&print_done[id]);
+        printf("In CPU%d (7)\n", id);
     } while (*runningQueue != NULL || *queue != NULL);
 
-    sem_wait(&print_done);
+    printf("In CPU%d (8)\n", id);
+    // if (*runningQueue == NULL && *queue == NULL)
+    // {
+    //     sem_wait(&print_done);
+    //     // set buffer to '-' whatever
+    //     pthread_mutex_lock(&buffer_mutex);
+    //     printBuffer[id] = '-';
+    //     // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
+    //     pthread_mutex_unlock(&buffer_mutex);
+
+    //     pthread_mutex_lock(&queue_mutex);
+    //     completed_cpus++;
+    //     pthread_mutex_unlock(&queue_mutex);
+
+    // }
 
     pthread_exit(0);
 }
@@ -369,13 +349,21 @@ int main(int argc, char **argv)
         newJob->next = NULL;
         enqueue(&queue, newJob);
     }
-    sem_init(&all_cpus_done, 0, 1);
-    sem_init(&print_done, 0, 2);
+    // Initialize CPU semaphore
+    for (int i = 0; i < numCpu; i++)
+    {
+        sem_init(&cpu_sem[i], 0, 0);
+    }
+
+    for (int i = 0; i < numCpu; i++)
+    {
+        sem_init(&print_done[i], 0, 0);
+    }
 
     // init mutext for input queue
-    if (pthread_mutex_init(&queue_mutex, NULL) != 0)
+    if (pthread_mutex_init(&buffer_mutex, NULL) != 0)
     {
-        perror("Failed to initialize queue_mutex");
+        perror("Failed to initialize buffer_mutex");
         return 1; // or handle the error as appropriate
     }
 
@@ -451,9 +439,13 @@ int main(int argc, char **argv)
         free(temp);
     }
     // Destory mutex and semaphore
-    pthread_mutex_destroy(&queue_mutex);
-    sem_destroy(&all_cpus_done);
-    sem_destroy(&print_done);
+    pthread_mutex_destroy(&buffer_mutex);
+
+    for (int i = 0; i < numCpu; i++)
+    {
+        sem_destroy(&cpu_sem[i]);
+        sem_destroy(&print_done[i]);
+    }
 
     free(cpus);
     free(cpu_thread_param);
