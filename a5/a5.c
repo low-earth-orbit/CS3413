@@ -314,7 +314,14 @@ void printSummary(Job *queue)
 int main(int argc, char **argv)
 {
     scanf("%i", &numCpu); // Scan to get the number of CPU
-    int quantums[numCpu]; // Create an array to store quantum for CPU
+
+    // Quantums array
+    int *quantums = (int *)malloc(numCpu * sizeof(int));
+    if (quantums == NULL)
+    {
+        perror("Failed to allocate memory for quantums\n");
+        return 1;
+    }
 
     Job *summary = NULL;
     Job *queue = NULL;
@@ -325,7 +332,7 @@ int main(int argc, char **argv)
     char buf5[100];
 
     // Create CPUs
-    CPU cpus[numCpu];
+    CPU *cpus = (CPU *)malloc(numCpu * sizeof(CPU));
     for (int i = 0; i < numCpu; i++)
     {
         cpus[i].current = NULL;
@@ -390,7 +397,14 @@ int main(int argc, char **argv)
 
     // Create CPU threads
     pthread_t cpu_threads[numCpu];
-    CpuThreadParam cpu_thread_param[numCpu];
+    // Dynamically allocating an array for thread parameters
+    CpuThreadParam *cpu_thread_param = malloc(numCpu * sizeof(CpuThreadParam));
+    if (cpu_thread_param == NULL)
+    {
+        perror("Failed to allocate memory for thread parameters\n");
+        return 1;
+    }
+
     for (int i = 0; i < numCpu; i++)
     {
         // Define cpu_thread_param[i]
@@ -440,6 +454,10 @@ int main(int argc, char **argv)
     pthread_mutex_destroy(&queue_mutex);
     sem_destroy(&all_cpus_done);
     sem_destroy(&print_done);
+
+    free(cpus);
+    free(cpu_thread_param);
+    free(quantums);
 
     return 0;
 }
