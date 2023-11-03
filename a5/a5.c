@@ -38,6 +38,9 @@ sem_t cpu_sem[100];                                       // CPU semaphore array
 sem_t print_done[100];                                    // Signal from print to CPU
 pthread_mutex_t buffer_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of print buffer
 pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;  // mutex to protect r/w of input queue among CPU threads
+pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER; // mutex to protect r/w of input queue among CPU threads
+
+int cpu_status[100];
 int completed_cpus = 0;
 int numCpu = 0;
 int isDone = 0;
@@ -140,9 +143,24 @@ void *print(void *param)
 
     while (1)
     {
+        int program_status = 0;
         for (int i = 0; i < numCpu; i++)
         {
-            sem_wait(&cpu_sem[i]);
+            if (cpu_status[i] != 0)
+            {
+                program_status = 1;
+            }
+        }
+
+        if (program_status != 1)
+        {
+            break;
+        }
+
+        for (int i = 0; i < numCpu; i++)
+        {
+            if (cpu_status[i] != 0)
+                sem_wait(&cpu_sem[i]);
         }
 
         printf("%d\t", print_time);
@@ -163,7 +181,10 @@ void *print(void *param)
 
         for (int i = 0; i < numCpu; i++)
         {
-            sem_post(&print_done[i]);
+            if (cpu_status[i] != 0)
+            {
+                sem_post(&print_done[i]);
+            }
         }
     }
     pthread_exit(0);
@@ -257,26 +278,21 @@ void *simulate(void *param)
 
         cpu->time++;
         sem_post(&cpu_sem[id]);
-        printf("In CPU%d (6)\n", id);
+        // printf("CPU%d\n", id);
+
         sem_wait(&print_done[id]);
-        printf("In CPU%d (7)\n", id);
     } while (*runningQueue != NULL || *queue != NULL);
 
-    printf("In CPU%d (8)\n", id);
-    // if (*runningQueue == NULL && *queue == NULL)
-    // {
-    //     sem_wait(&print_done);
-    //     // set buffer to '-' whatever
-    //     pthread_mutex_lock(&buffer_mutex);
-    //     printBuffer[id] = '-';
-    //     // printf("CPU%d, time%d, printBuffer: %s\n", id, cpu->time, printBuffer);
-    //     pthread_mutex_unlock(&buffer_mutex);
+    // printf("CPU%d exiting\n", id);
+    pthread_mutex_lock(&status_mutex);
+    cpu_status[id] = 0;
+    pthread_mutex_unlock(&status_mutex);
 
-    //     pthread_mutex_lock(&queue_mutex);
-    //     completed_cpus++;
-    //     pthread_mutex_unlock(&queue_mutex);
+    pthread_mutex_lock(&buffer_mutex);
+    printBuffer[id] = '-';
+    pthread_mutex_unlock(&buffer_mutex);
 
-    // }
+    sem_post(&cpu_sem[id]);
 
     pthread_exit(0);
 }
@@ -353,11 +369,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < numCpu; i++)
     {
         sem_init(&cpu_sem[i], 0, 0);
-    }
-
-    for (int i = 0; i < numCpu; i++)
-    {
         sem_init(&print_done[i], 0, 0);
+        cpu_status[i] = 1;
     }
 
     // init mutext for input queue
