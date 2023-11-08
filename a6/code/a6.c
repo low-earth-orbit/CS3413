@@ -42,7 +42,7 @@ int doFree(int processId)
             current->processId = -1; // Mark block as free
             totalTerminated++;
             totalFreedMemory += current->endAddress - current->startAddress + 1;
-            // Try to merge with next block if it's also free
+            // Merge with next block if it's also free
             if (current->next != NULL && current->next->processId == -1)
             {
                 MemoryBlock *temp = current->next;
@@ -50,7 +50,7 @@ int doFree(int processId)
                 current->next = temp->next;
                 free(temp);
             }
-            // Try to merge with previous block if it's also free
+            // Merge with previous block if it's also free
             if (prev != NULL && prev->processId == -1)
             {
                 prev->endAddress = current->endAddress;
@@ -73,15 +73,46 @@ int doAllocate(int howMuchToAllocate, int processId)
 
     switch (algorithm)
     {
-    case 1:
+    case 1: // 1 - best fit
     {
         break;
     }
-    case 2:
+    case 2: // 2 - worst fit
     {
+        MemoryBlock *current = head;
+        int biggest = getBiggest(); // Get biggest available memory size
+        // Iterate all memory blocks
+        while (current != NULL)
+        {
+            int blockSize = current->endAddress - current->startAddress + 1;
+            if (current->processId == -1 && blockSize >= howMuchToAllocate && blockSize == biggest)
+            {
+                // Allocate memory
+                if (blockSize > howMuchToAllocate)
+                {
+                    // Split the block
+                    MemoryBlock *newBlock = (MemoryBlock *)malloc(sizeof(MemoryBlock));
+                    newBlock->startAddress = current->startAddress + howMuchToAllocate;
+                    newBlock->endAddress = current->endAddress;
+                    newBlock->processId = -1; // The new block is free
+                    newBlock->next = current->next;
+
+                    current->endAddress = current->startAddress + howMuchToAllocate - 1;
+                    current->next = newBlock;
+                }
+                current->processId = processId;         // Assign block with process ID
+                totalAllocated++;                       // Increment counter
+                totalMemAllocated += howMuchToAllocate; // Increment counter
+                return 1;                               // Success
+            }
+            current = current->next; // Go to the next block
+        }
+        printf("Process %d failed to allocate %d memory\n", processId, howMuchToAllocate);
+        totalFailed++; // Increment counter
+        return 0;      // Failure
         break;
     }
-    case 3:
+    case 3: // 3 - first fit
     {
         MemoryBlock *current = head;
         // Iterate all memory blocks
