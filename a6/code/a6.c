@@ -68,13 +68,98 @@ int doFree(int processId)
     return 0; // Failure: processId not found
 }
 
+int getSmallest(MemoryBlock *head)
+{
+    int smallest = memSize; // Initialize with maximum possible size
+    int found = 0;
+    MemoryBlock *current = head;
+    while (current != NULL)
+    {
+        if (current->processId == -1) // Memory block is not used by process
+        {
+            int blockSize = current->endAddress - current->startAddress + 1;
+            if (blockSize <= smallest)
+            {
+                if (found == 0)
+                    found = 1;
+                smallest = blockSize;
+            }
+        }
+        current = current->next;
+    }
+
+    if (found == 0)
+        return 0;
+
+    return smallest;
+}
+
+int getBiggest()
+{
+    int biggest = 0; // Initialize with minimum possible size
+    int found = 0;
+    MemoryBlock *current = head;
+    while (current != NULL)
+    {
+        if (current->processId == -1) // Memory block is not used by process
+        {
+            int blockSize = current->endAddress - current->startAddress + 1;
+            if (blockSize >= biggest)
+            {
+                if (found == 0)
+                    found = 1;
+                biggest = blockSize;
+            }
+        }
+        current = current->next;
+    }
+    if (found == 0)
+        return 0;
+    return biggest;
+}
+
 int doAllocate(int howMuchToAllocate, int processId)
 {
-
     switch (algorithm)
     {
     case 1: // 1 - best fit
     {
+        MemoryBlock *current = head;
+        int smallest;
+
+        // Iterate all memory blocks
+        while (current != NULL)
+        {
+            smallest = getSmallest(current); // Get smallest available memory size from current node and on
+
+            int blockSize = current->endAddress - current->startAddress + 1;
+
+            if (current->processId == -1 && blockSize == smallest && smallest >= howMuchToAllocate)
+            {
+                // Allocate memory
+                if (blockSize > howMuchToAllocate)
+                {
+                    // Split the block
+                    MemoryBlock *newBlock = (MemoryBlock *)malloc(sizeof(MemoryBlock));
+                    newBlock->startAddress = current->startAddress + howMuchToAllocate;
+                    newBlock->endAddress = current->endAddress;
+                    newBlock->processId = -1; // The new block is free
+                    newBlock->next = current->next;
+
+                    current->endAddress = current->startAddress + howMuchToAllocate - 1;
+                    current->next = newBlock;
+                }
+                current->processId = processId;         // Assign block with process ID
+                totalAllocated++;                       // Increment counter
+                totalMemAllocated += howMuchToAllocate; // Increment counter
+                return 1;                               // Success
+            }
+            current = current->next; // Go to the next block
+        }
+        printf("Process %d failed to allocate %d memory\n", processId, howMuchToAllocate);
+        totalFailed++; // Increment counter
+        return 0;      // Failure
+        break;
         break;
     }
     case 2: // 2 - worst fit
@@ -184,56 +269,6 @@ int getNumberOfChunks()
     return count;
 }
 
-int getSmallest()
-{
-    int smallest = memSize; // Initialize with maximum possible size
-    int found = 0;
-    MemoryBlock *current = head;
-    while (current != NULL)
-    {
-        if (current->processId == -1) // Memory block is not used by process
-        {
-            int blockSize = current->endAddress - current->startAddress + 1;
-            if (blockSize <= smallest)
-            {
-                if (found == 0)
-                    found = 1;
-                smallest = blockSize;
-            }
-        }
-        current = current->next;
-    }
-
-    if (found == 0)
-        return 0;
-
-    return smallest;
-}
-
-int getBiggest()
-{
-    int biggest = 0; // Initialize with minimum possible size
-    int found = 0;
-    MemoryBlock *current = head;
-    while (current != NULL)
-    {
-        if (current->processId == -1) // Memory block is not used by process
-        {
-            int blockSize = current->endAddress - current->startAddress + 1;
-            if (blockSize >= biggest)
-            {
-                if (found == 0)
-                    found = 1;
-                biggest = blockSize;
-            }
-        }
-        current = current->next;
-    }
-    if (found == 0)
-        return 0;
-    return biggest;
-}
-
 int main(int argc, char **argv)
 {
     int i = 0;
@@ -282,7 +317,7 @@ int main(int argc, char **argv)
             doFree(id);
             break;
         case 'S':
-            printf("Total Processes created %d, Total allocated memory %d, Total Processes\nterminated %d, Total freed memory %d, Final memory available %d, Final\nsmallest and largest fragmented memory sizes %d and %d, total failed requests:%d, number of memory chunks: %d\n", totalAllocated, totalMemAllocated, totalTerminated, totalFreedMemory, calcFinalMemory(), getSmallest(), getBiggest(), totalFailed, getNumberOfChunks());
+            printf("Total Processes created %d, Total allocated memory %d, Total Processes\nterminated %d, Total freed memory %d, Final memory available %d, Final\nsmallest and largest fragmented memory sizes %d and %d, total failed requests:%d, number of memory chunks: %d\n", totalAllocated, totalMemAllocated, totalTerminated, totalFreedMemory, calcFinalMemory(), getSmallest(head), getBiggest(), totalFailed, getNumberOfChunks());
             break;
         }
     }
