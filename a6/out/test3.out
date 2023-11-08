@@ -1,0 +1,4 @@
+Process 3 failed to allocate 5 memory
+Total Processes created 2, Total allocated memory 10, Total Processes
+terminated 0, Total freed memory 0, Final memory available 0, Final
+smallest and largest fragmented memory sizes 0 and 0, total failed requests:1, number of memory chunks: 0
