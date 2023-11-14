@@ -66,8 +66,6 @@ int main(int argc, char **argv)
         /* now that you have the physical frame index corresponding to your page stored in tempFrameIndex, get the starting address of the frame by index and add the page offset to it and voila, you have your physical address. Print it out in the format
         printf("Physical address is %i logical address is %i\n" ..);
         */
-        printf("Read %i\n", logicalAddress);
-
         int physicalAddress = getStartingAddressOfTheFrameByIndex(tempFrameIndex) + pageOffset;
         printf("Physical address is %d; Logical address is %d\n", physicalAddress, logicalAddress);
     }
@@ -91,5 +89,20 @@ Part 1
 
 Part 2
 ======
+1.
+Physical address is 1; Logical address is 4097
+Physical address is 4196; Logical address is 100
+Physical address is 4596; Logical address is 500
+Physical address is 12000; Logical address is 12000
+Physical address is 4396; Logical address is 300
+Physical address is 8500; Logical address is 8500
+Physical address is 904; Logical address is 5000
+Physical address is 13012; Logical address is 25300
+Physical address is 604; Logical address is 4700
+Physical address is 17096; Logical address is 13000
+Physical address is 19096; Logical address is 15000
+Physical address is 22140; Logical address is 22140
+Physical address is 14712; Logical address is 27000
+
 2. 4 megabytes
 */
