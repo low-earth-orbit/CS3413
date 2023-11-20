@@ -1,0 +1,15 @@
+Logical addresses -> Physical addresses:
+1725896583 -> 1927
+1725896583 -> 1927
+1725898287 -> 3631
+1725894961 -> 305
+1725896008 -> 1352
+1725898705 -> 4049
+1725898485 -> 3829
+1725897033 -> 2377
+
+Stats:
+major page faults = 1
+page hits = 7
+pages swapped out = 0
+Effective Access Time = 133.7500

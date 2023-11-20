@@ -1,0 +1,14 @@
+Logical addresses -> Physical addresses:
+1124955998 -> 1886
+794845611 -> 4523
+1540976830 -> 8382
+1124957700 -> 3588
+1081961846 -> 7542
+794845440 -> 8448
+1540976645 -> 5
+
+Stats:
+major page faults = 6
+page hits = 1
+pages swapped out = 0
+Effective Access Time = 858.5715
