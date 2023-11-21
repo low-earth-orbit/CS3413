@@ -229,7 +229,7 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("\nStats:\nmajor page faults = %u\npage hits = %u\npages swapped out = %u\nEffective Access Time = %.4f\n", pageFault, pageHits, pagesSwapped, computeFormula());
+    printf("\nStats:\nmajor page faults = %u\npage hits = %u\npages swapped out = %u\nEffective Access Time = %.3lf\n", pageFault, pageHits, pagesSwapped, computeFormula());
 
     // Free page table
     free(pageTable);
