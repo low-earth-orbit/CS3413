@@ -113,7 +113,7 @@ int findFreeFrame()
     return -1; // No free frame found
 }
 
-void handlePageFault(Page *page, unsigned long logicalAddress)
+void handlePageFault(Page *page, unsigned long logicalAddress, bool isWrite)
 {
     // Find a free frame
     int freeFrameId = findFreeFrame();
@@ -122,56 +122,48 @@ void handlePageFault(Page *page, unsigned long logicalAddress)
         // Free frame found
         // Assign the free frame to the page
         page->frameId = freeFrameId;
+
+        // Print
         printPhysicalAddress(page->frameId, logicalAddress);
     }
-    else // No free frame
+    else
     {
-        // Identify the least recently used page / victim page
-        Page *lruPage = lruRear;
+        // No free frame
+        // Identify the least recently used page
+        Page *victimPage = lruRear;
 
-        while (lruPage != NULL)
+        // The while loop is needed for catching the case that the page has only been accessed for reading
+        while (victimPage != NULL)
         {
-            // If lruPage is dirty, swap out
-            if (lruPage->dirty)
+            // If victimPage is dirty, swap out
+            if (victimPage->dirty || !victimPage->read)
             {
-                pagesSwapped++; // Increment swapped page counter
+
+                if (victimPage->dirty)
+                {
+                    pagesSwapped++; // Increment swapped page counter if the page is dirty
+                }
 
                 // Remove from LRU
-                removeFromLRU(lruPage);
+                removeFromLRU(victimPage);
 
-                lruPage->dirty = 0;
-                lruPage->read = 0;
+                // Now use victimPage's frame for the new page
+                page->frameId = victimPage->frameId;
+                page->dirty = isWrite;
+                page->read = !isWrite;
 
-                // Now use lruPage's frame for the new page
-                page->frameId = lruPage->frameId;
-                lruPage->frameId = -1;
+                victimPage->frameId = -1;
+                victimPage->dirty = 0;
+                victimPage->read = 0;
+
+                // Print
+                printPhysicalAddress(page->frameId, logicalAddress);
+
                 break;
             }
-            else if (!lruPage->read)
-            {
-                // If clean and never read, discard
-                // Remove from LRU
-                removeFromLRU(lruPage);
 
-                lruPage->dirty = 0;
-                lruPage->read = 0;
-
-                // Now use lruPage's frame for the new page
-                page->frameId = lruPage->frameId;
-                lruPage->frameId = -1;
-                break;
-            }
-            else
-            {
-                // The page has only been accessed for reading
-                // We do not swap it
-                // Remove from LRU
-                // TODO:
-                // removeFromLRU(lruPage);
-                // addToFrontOfLRU(page);
-                printf("HERE!");
-                break;
-            }
+            // Move to the previous page since this page has only been accessed for reading
+            victimPage = victimPage->prev;
         }
     }
     // Add the new page to the LRU list
@@ -186,7 +178,7 @@ void accessPage(unsigned long logicalAddress, bool isWrite)
     if (page->frameId == -1)
     {
         // Page fault encountered
-        handlePageFault(page, logicalAddress);
+        handlePageFault(page, logicalAddress, isWrite);
         pageFault++;
     }
     else
