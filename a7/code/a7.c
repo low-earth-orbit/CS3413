@@ -96,8 +96,13 @@ void printPhysicalAddress(int frameID, unsigned long logicalAddress)
 
 double computeFormula()
 {
-    // TODO work on that
-    return 0.0f;
+    double numOpr = pageFault + pageHits;
+    double probNoPageFault = pageHits / numOpr;
+    double probPageFaultOneCopy = (pageFault - pagesSwapped) / numOpr;
+    double probPageFaultTwoCopy = pagesSwapped / numOpr;
+
+    double result = probNoPageFault * 10 + probPageFaultOneCopy * 1000 + probPageFaultTwoCopy * 3000;
+    return result;
 }
 
 int findFreeFrame()
