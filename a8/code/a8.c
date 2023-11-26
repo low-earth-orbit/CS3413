@@ -1,32 +1,86 @@
 #include <stdio.h>
+#include <stdlib.h>
+
 char currentDirection;
+int nextPosition;
+int start = 0;
 
-void fcfs(int start){
+void fcfs()
+{
+    int movement = 0;
+    double timeIn = 0; // This is job's arrival time
+    double time = 0;   // This is total time
+    int currentPosition = start;
+
+    while (EOF != (scanf("%i %lf\n", &nextPosition, &timeIn)))
+    {
+        int distance = abs(nextPosition - currentPosition);
+        movement += distance;
+
+        // Direction reversed
+        if ((nextPosition - currentPosition) < 0 && currentDirection == 'a')
+        {
+            if (timeIn > time)
+            {
+                time = timeIn + distance / 5.0 + 15;
+            }
+            else
+            {
+                time = time + distance / 5.0 + 15;
+            }
+            currentDirection = 'd';
+        }
+        else if ((nextPosition - currentPosition) > 0 && currentDirection == 'd')
+        {
+            if (timeIn > time)
+            {
+                time = timeIn + distance / 5.0 + 15;
+            }
+            else
+            {
+                time = time + distance / 5.0 + 15;
+            }
+            currentDirection = 'a';
+        }
+        else
+        {
+            if (timeIn > time)
+            {
+                time = timeIn + distance / 5.0;
+            }
+            else
+            {
+                time = time + distance / 5.0;
+            }
+        }
+
+        // Update currentPosition
+        currentPosition = nextPosition;
+    }
+
+    printf("Movement:%i Time:%.1lf\n", movement, time);
+}
+
+void cscan(int start)
+{
     int movement = 0;
     double time = 0;
     printf("Movement: %i Time:%.1lf\n", movement, time);
 }
 
-void cscan(int start){
-    int movement = 0;
-    double time = 0;
-    printf("Movement: %i Time:%.1lf\n", movement, time);
-}
+int main(int argc, char **argv)
+{
 
-int main (int argc, char** argv){
-    int position, time;
     char algorithm = argv[1][0];
     int start = 0;
-    currentDirection  = 'a';
+    currentDirection = 'a';
 
-
-    while ( EOF!=(scanf("%i %i\n",&position,&time)))
+    if (algorithm == 'F')
     {
-        printf("Delete me: position %i, Delete me: time %i\n",position,time);
-    }
-    if (algorithm == 'F'){
         fcfs(start);
-    }else if ( algorithm == 'C'){
+    }
+    else if (algorithm == 'C')
+    {
         cscan(start);
     }
 
