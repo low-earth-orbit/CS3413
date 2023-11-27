@@ -97,6 +97,25 @@ void cscan()
 
     while (EOF != (scanf("%i %lf\n", &positionIn, &timeIn)))
     {
+        printf("positionIn: %i timeIn:%.1lf\n", positionIn, timeIn);
+        printf("Movement: %i Time:%.1lf\n", movementCount, timeCount);
+
+        if (timeCount < timeIn && requestCount > 0)
+        {
+            // Go back if the last request in queue
+            if (lastProcessedIndex == requestCount - 1)
+            {
+                currentPosition = start; // To start
+                int distance = abs(requests[lastProcessedIndex].sector - currentPosition);
+                movementCount += distance;
+                // Update timeCount, additional time to redirection
+
+                timeCount = timeCount + distance / 5.0 + 15.0;
+
+                lastProcessedIndex = -1;
+            }
+        }
+
         addRequest(positionIn, timeIn);
         // Sort requests by sector
         qsort(requests, requestCount, sizeof(Request), compare);
@@ -104,7 +123,7 @@ void cscan()
         // Process the requests
         for (int i = 0; i < requestCount; i++)
         {
-            if (requests[i].sector >= currentPosition && i > lastProcessedIndex)
+            if (requests[i].sector != -1 && requests[i].sector >= currentPosition && i > lastProcessedIndex)
             {
                 int distance = abs(requests[i].sector - currentPosition);
                 movementCount += distance;
@@ -120,26 +139,6 @@ void cscan()
                     timeCount = timeCount + distance / 5.0;
                 }
             }
-        }
-
-        // Go back if the last request in queue
-        if (lastProcessedIndex == requestCount - 1)
-        {
-            // TODO
-
-            currentPosition = start; // To start
-            int distance = abs(requests[lastProcessedIndex].sector - currentPosition);
-            movementCount += distance;
-            // Update timeCount, additional time to redirection
-            if (timeIn > timeCount)
-            {
-                timeCount = timeIn + distance / 5.0 + 15.0;
-            }
-            else
-            {
-                timeCount = timeCount + distance / 5.0 + 15.0;
-            }
-            lastProcessedIndex = -1;
         }
     }
 
