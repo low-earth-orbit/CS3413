@@ -94,50 +94,101 @@ void cscan()
     double timeCount = 0; // This is total time
     int currentPosition = start;
     int lastProcessedIndex = -1;
-
+    int differentTime = 0;
     while (EOF != (scanf("%i %lf\n", &positionIn, &timeIn)))
     {
         printf("positionIn: %i timeIn:%.1lf\n", positionIn, timeIn);
-        printf("Movement: %i Time:%.1lf\n", movementCount, timeCount);
+        printf("Before: Movement: %i Time:%.1lf\n", movementCount, timeCount);
 
-        if (timeCount < timeIn && requestCount > 0)
+        if (timeCount < timeIn)
         {
-            // Go back if the last request in queue
-            if (lastProcessedIndex == requestCount - 1)
+            timeCount = timeIn;
+
+            // Check if wrap-around is needed
+            if (lastProcessedIndex != -1 && lastProcessedIndex == (requestCount - 1))
             {
-                currentPosition = start; // To start
-                int distance = abs(requests[lastProcessedIndex].sector - currentPosition);
-                movementCount += distance;
-                // Update timeCount, additional time to redirection
+                printf("!!!!!!!!!!inside wrap-around block\n");
+                currentPosition = start; // Reset to start
+                lastProcessedIndex = -1; // Reset last processed index
+                // No movement count added for wrap-around, time for redirection only
+                timeCount += 15.0;
 
-                timeCount = timeCount + distance / 5.0 + 15.0;
+                // Wrapped around occurred, start from 0
+                for (int i = 0; i < requestCount; i++)
+                {
+                    if (requests[i].sector != -1)
+                    {
+                        int distance = abs(requests[i].sector - currentPosition);
 
-                lastProcessedIndex = -1;
+                        movementCount += distance;
+                        printf("Movement count inside: %d\n", movementCount);
+
+                        currentPosition = requests[i].sector;
+                        // Update timeCount, assuming continuous processing
+                        timeCount += distance / 5.0;
+                        requests[i].sector = -1;
+                    }
+                }
             }
         }
 
         addRequest(positionIn, timeIn);
+        printf("requestCount = %d\n", requestCount);
+
         // Sort requests by sector
         qsort(requests, requestCount, sizeof(Request), compare);
 
         // Process the requests
         for (int i = 0; i < requestCount; i++)
         {
-            if (requests[i].sector != -1 && requests[i].sector >= currentPosition && i > lastProcessedIndex)
+            printf("currentPosition = %d requests[i].sector = %d\n", currentPosition, requests[i].sector);
+            if (requests[i].sector != -1 && requests[i].sector >= currentPosition)
             {
                 int distance = abs(requests[i].sector - currentPosition);
                 movementCount += distance;
                 currentPosition = requests[i].sector;
                 lastProcessedIndex = i;
-                // Update timeCount
-                if (timeIn > timeCount)
-                {
-                    timeCount = timeIn + distance / 5.0;
-                }
-                else
-                {
-                    timeCount = timeCount + distance / 5.0;
-                }
+                timeCount = timeCount + distance / 5.0;
+                requests[i].sector = -1;
+            }
+        }
+
+        printf("requestCount = %i\n", requestCount);
+        printf("lastProcessedIndex = %i \n", lastProcessedIndex);
+        printf("After: Movement: %i Time:%.1lf\n", movementCount, timeCount);
+    }
+
+    int finalWrapAround = 0;
+    for (int i = 0; i < requestCount; i++)
+    {
+        if (requests[i].sector != -1)
+        {
+            printf("requests[i].sector in wrap around check = %d\n", requests[i].sector);
+            finalWrapAround = 1;
+            break;
+        }
+    }
+
+    // Do an extra loop
+    if (finalWrapAround == 1)
+    {
+        timeCount += 15.0;
+        currentPosition = start; // Reset to start
+        for (int i = 0; i < requestCount; i++)
+        {
+            if (requests[i].sector != -1)
+            {
+                printf("requests[i].sector = %d\n", requests[i].sector);
+
+                finalWrapAround = 1;
+                int distance = abs(requests[i].sector - currentPosition);
+
+                movementCount += distance;
+                printf("Movement count inside: %d\n", movementCount);
+
+                currentPosition = requests[i].sector;
+                timeCount += distance / 5.0;
+                requests[i].sector = -1;
             }
         }
     }
