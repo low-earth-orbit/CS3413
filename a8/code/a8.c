@@ -139,19 +139,21 @@ void cscan()
         qsort(requests, requestCount, sizeof(Request), compare);
 
         // Process the requests
+        int tempPosition = currentPosition;
         for (int i = 0; i < requestCount; i++)
         {
             printf("currentPosition = %d requests[i].sector = %d\n", currentPosition, requests[i].sector);
             if (requests[i].sector != -1 && requests[i].sector >= currentPosition)
             {
-                int distance = abs(requests[i].sector - currentPosition);
+                int distance = abs(requests[i].sector - tempPosition);
                 movementCount += distance;
-                currentPosition = requests[i].sector;
+                tempPosition = requests[i].sector;
                 lastProcessedIndex = i;
                 timeCount = timeCount + distance / 5.0;
                 requests[i].sector = -1;
             }
         }
+        currentPosition = tempPosition;
 
         printf("requestCount = %i\n", requestCount);
         printf("lastProcessedIndex = %i \n", lastProcessedIndex);
