@@ -18,6 +18,14 @@ int isPng(FILE *file)
     return memcmp(buffer, pngSignature, 8) == 0;
 }
 
+void xorChunkData(unsigned char *data, uint32_t length)
+{
+    for (uint32_t i = 0; i < length; i++)
+    {
+        data[i] ^= 42; // XOR each byte with 42
+    }
+}
+
 bool isTraverseFinished = false;
 
 int main(int argc, char **argv)
@@ -82,8 +90,35 @@ int main(int argc, char **argv)
 
             printf("Chunk size is:%d\n", lengthOfChunk);
 
-            // Skip bytes
-            fseek(file, lengthOfChunk, SEEK_CUR);
+            // If type is IDAT, XOR every byte by 42
+            if (strcmp(chunkType, "IDAT") == 0)
+            {
+                // Allocate memory for a data buffer
+                unsigned char *buffer = malloc(lengthOfChunk);
+                if (!buffer)
+                {
+                    perror("Failed to allocate memory for data buffer\n");
+                    return EXIT_FAILURE;
+                }
+
+                // Read the chunk data
+                if (fread(buffer, 1, lengthOfChunk, file) != lengthOfChunk)
+                {
+                    perror("Unable to read data buffer");
+                    return EXIT_FAILURE;
+                }
+
+                // XOR the chunk data by 42
+                xorChunkData(buffer, lengthOfChunk);
+
+                // Free the data buffer
+                free(buffer);
+            }
+            else
+            {
+                // Skip data bytes if type is not IDAT
+                fseek(file, lengthOfChunk, SEEK_CUR);
+            }
 
             // Skip CRC (4 bytes)
             fseek(file, 4, SEEK_CUR);
