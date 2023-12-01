@@ -7,7 +7,7 @@
 // Check if it is PNG file base on the header
 int isPng(FILE *file)
 {
-    unsigned char pngSignature[8] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    unsigned char pngSignature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
     unsigned char buffer[8];
 
     if (fread(buffer, 1, 8, file) != 8)
