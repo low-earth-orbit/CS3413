@@ -50,7 +50,7 @@ void add(Node **head, char *data)
 }
 
 /*
- * removes the first occurrance of the element specified by the second paramter from the linked list
+ * removes the first occurrance of the element specified by the second paramater from the linked list
  */
 void delete(Node **head, char *data)
 {
@@ -156,7 +156,7 @@ void findAndReplace(Node *head, char *data, char *newData)
 /*
  * prints each element in the linked list to the console
  */
-void printList(Node *head)
+void printSummary(Node *head)
 {
     // if list is empty
     if (head == NULL)
@@ -279,7 +279,7 @@ int main()
             findAndReplace(head, data, newData);
             break;
         case 'p':
-            printList(head);
+            printSummary(head);
             break;
         case 's':
             stop(&head);
