@@ -52,6 +52,7 @@ int main(int argc, char **argv)
         {
             uint32_t lengthOfChunk;
             char chunkType[5]; // 4 characters + null terminator
+            long dataStartPosition;
 
             // Read the length of the chunk. 4 bytes. big-endian
             if (fread(&lengthOfChunk, 1, 4, file) != 4)
@@ -93,6 +94,9 @@ int main(int argc, char **argv)
             // If type is IDAT, XOR every byte by 42
             if (strcmp(chunkType, "IDAT") == 0)
             {
+                // Save the start position of the chunk data
+                dataStartPosition = ftell(file);
+
                 // Allocate memory for a data buffer
                 unsigned char *buffer = malloc(lengthOfChunk);
                 if (!buffer)
@@ -110,6 +114,12 @@ int main(int argc, char **argv)
 
                 // XOR the chunk data by 42
                 xorChunkData(buffer, lengthOfChunk);
+
+                // Move file pointer back to start position of the chunk data
+                fseek(file, dataStartPosition, SEEK_SET);
+
+                // Write the modified data back to the file
+                fwrite(buffer, 1, lengthOfChunk, file);
 
                 // Free the data buffer
                 free(buffer);
