@@ -26,8 +26,6 @@ void xorChunkData(unsigned char *data, uint32_t length)
     }
 }
 
-bool isTraverseFinished = false;
-
 int main(int argc, char **argv)
 {
     if (argc != 2)
@@ -36,7 +34,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    FILE *file = fopen(argv[1], "rb");
+    FILE *file = fopen(argv[1], "r+"); // Opens a file to update both reading and writing. The file must exist.
     if (!file)
     {
         perror("Unable to open file");
@@ -48,10 +46,12 @@ int main(int argc, char **argv)
     {
         printf("It's a PNG file\n");
 
+        bool isTraverseFinished = false;
+
         while (!isTraverseFinished)
         {
             uint32_t lengthOfChunk;
-            char chunkType[5]; // 4 characters + null terminator
+            char chunkType[5]; // 4 characters + null-terminator
             long dataStartPosition;
 
             // Read the length of the chunk. 4 bytes. big-endian
@@ -97,29 +97,41 @@ int main(int argc, char **argv)
                 // Save the start position of the chunk data
                 dataStartPosition = ftell(file);
 
-                // Allocate memory for a data buffer
+                // Allocate memory for a buffer
                 unsigned char *buffer = malloc(lengthOfChunk);
                 if (!buffer)
                 {
-                    perror("Failed to allocate memory for data buffer\n");
+                    perror("Failed to allocate memory for buffer\n");
                     return EXIT_FAILURE;
                 }
 
-                // Read the chunk data
+                // Read the chunk data to the buffer
+                // This moves file pointer
                 if (fread(buffer, 1, lengthOfChunk, file) != lengthOfChunk)
                 {
-                    perror("Unable to read data buffer");
+                    free(buffer);
+                    perror("Unable to read data buffer\n");
                     return EXIT_FAILURE;
                 }
 
-                // XOR the chunk data by 42
+                // XOR the buffer by 42
                 xorChunkData(buffer, lengthOfChunk);
 
                 // Move file pointer back to start position of the chunk data
-                fseek(file, dataStartPosition, SEEK_SET);
+                if (fseek(file, dataStartPosition, SEEK_SET) != 0)
+                {
+                    free(buffer);
+                    perror("fseek failed\n");
+                    return EXIT_FAILURE;
+                }
 
-                // Write the modified data back to the file
-                fwrite(buffer, 1, lengthOfChunk, file);
+                // Write the buffer to the file
+                if (fwrite(buffer, 1, lengthOfChunk, file) != lengthOfChunk)
+                {
+                    free(buffer);
+                    perror("fwrite failed\n");
+                    return EXIT_FAILURE;
+                }
 
                 // Free the data buffer
                 free(buffer);
@@ -127,11 +139,19 @@ int main(int argc, char **argv)
             else
             {
                 // Skip data bytes if type is not IDAT
-                fseek(file, lengthOfChunk, SEEK_CUR);
+                if (fseek(file, lengthOfChunk, SEEK_CUR) != 0)
+                {
+                    perror("fseek failed\n");
+                    return EXIT_FAILURE;
+                }
             }
 
             // Skip CRC (4 bytes)
-            fseek(file, 4, SEEK_CUR);
+            if (fseek(file, 4, SEEK_CUR) != 0)
+            {
+                perror("fseek failed\n");
+                return EXIT_FAILURE;
+            }
         }
     }
     else
