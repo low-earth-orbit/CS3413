@@ -164,6 +164,7 @@ int main(int argc, char **argv)
 }
 
 /*
+   Portable Network Graphics (PNG) Specification, version 1.2
    Copyright notice
 
       Copyright (c) 1998, 1999 by:  Glenn Randers-Pehrson
