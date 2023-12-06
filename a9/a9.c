@@ -162,3 +162,42 @@ int main(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
+
+/*
+   Copyright notice
+
+      Copyright (c) 1998, 1999 by:  Glenn Randers-Pehrson
+
+      This specification is a modification of the PNG 1.0 specification.
+      It is being provided by the copyright holder under the provisions
+      of the 1996 MIT copyright and license:
+
+      Copyright (c) 1996 by:  Massachusetts Institute of Technology
+      (MIT)
+
+      This W3C specification is being provided by the copyright holders
+      under the following license.  By obtaining, using and/or copying
+      this specification, you agree that you have read, understood, and
+      will comply with the following terms and conditions:
+
+      Permission to use, copy, and distribute this specification for any
+      purpose and without fee or royalty is hereby granted, provided
+      that the full text of this NOTICE appears on ALL copies of the
+      specification or portions thereof, including modifications, that
+      you make.
+
+      THIS SPECIFICATION IS PROVIDED "AS IS," AND COPYRIGHT HOLDERS MAKE
+      NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED.  BY WAY OF
+      EXAMPLE, BUT NOT LIMITATION, COPYRIGHT HOLDERS MAKE NO
+      REPRESENTATIONS OR WARRANTIES OF MERCHANTABILITY OR FITNESS FOR
+      ANY PARTICULAR PURPOSE OR THAT THE USE OF THE SPECIFICATION WILL
+      NOT INFRINGE ANY THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR
+      OTHER RIGHTS.  COPYRIGHT HOLDERS WILL BEAR NO LIABILITY FOR ANY
+      USE OF THIS SPECIFICATION.
+
+      The name and trademarks of copyright holders may NOT be used in
+      advertising or publicity pertaining to the specification without
+      specific, written prior permission.  Title to copyright in this
+      specification and any associated documentation will at all times
+      remain with copyright holders.
+*/
